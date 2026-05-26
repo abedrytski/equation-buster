@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Survie Mathématique</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0a0a14" />
+    <title>Math Survivor</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -11,72 +12,74 @@
 
     <div id="hud">
       <div id="hudLeft">
-        <span id="levelText">Niv : <b>1</b></span>
-        <span id="xpText"><span class="xpIcon">⬢</span> <b>0</b></span>
-        <span id="trainingBadge" hidden>Entraînement : <b id="trainingNum">—</b></span>
+        <span id="waveText">Wave <b>1</b></span>
+        <span id="trainingBadge" hidden>Training: <b id="trainingNum">—</b></span>
       </div>
       <div id="hudRightAdd">
-        <span id="charge">
+        <button id="charge" type="button" aria-label="bomb">
           <span class="ico">⚡</span>
           <span id="chargeVal">0/15</span>
-        </span>
-        <span id="lives" aria-label="vies"></span>
+        </button>
+        <span id="lives" aria-label="lives"></span>
       </div>
     </div>
     <div id="xpBar"><div id="xpFill"></div></div>
 
-    <div id="levelUp" hidden>NIVEAU SUPÉRIEUR</div>
-    <div id="bossAlert" hidden>BOSS !</div>
+    <div id="streak" hidden><span id="streakLabel">STREAK</span> <b id="streakValue">0</b><span id="streakMult">×2</span></div>
+
+    <div id="waveAnnounce" hidden>WAVE 1</div>
+    <div id="breather" hidden><div class="breatherLabel">NEXT WAVE</div><div class="breatherCount" id="breatherCount">3</div></div>
+    <div id="bossAlert" hidden>BOSS!</div>
 
     <div id="paused" hidden>
       <h1>PAUSE</h1>
-      <p>Appuie sur <kbd>Échap</kbd> pour reprendre</p>
+      <p>Press <kbd>Esc</kbd> to resume</p>
     </div>
 
-    <div id="inputBox">
+    <div id="inputBox" hidden>
       <div id="inputValue">&nbsp;</div>
-      <div id="inputLabel">RÉPONSE</div>
+      <div id="inputLabel">ANSWER</div>
     </div>
 
-    <div id="hint">Tape la réponse, puis <kbd>Entrée</kbd> pour tirer. <kbd>Retour arrière</kbd> pour corriger. <kbd>Échap</kbd> pour mettre en pause.</div>
+    <div id="chipBar" hidden></div>
 
     <div id="startScreen">
-      <h1>SURVIE MATHÉMATIQUE</h1>
-      <p class="subtitle">Choisis la difficulté</p>
+      <h1>MATH SURVIVOR</h1>
+      <p class="subtitle">Choose difficulty</p>
       <div class="diffOptions">
         <button class="diffBtn" data-diff="tresfacile">
-          <span class="title">TRÈS FACILE</span>
+          <span class="title">VERY EASY</span>
           <span class="key">1</span>
-          <span class="row">Nombres jusqu'à 12</span>
-          <span class="row">Que des cibles jaunes</span>
-          <span class="row">Et quelques roses</span>
+          <span class="row">Numbers up to 12</span>
+          <span class="row">Yellow targets only</span>
+          <span class="row">And a few pink</span>
         </button>
         <button class="diffBtn" data-diff="easy">
-          <span class="title">FACILE</span>
+          <span class="title">EASY</span>
           <span class="key">2</span>
-          <span class="row">Nombres jusqu'à 20</span>
-          <span class="row">Peu d'ennemis</span>
-          <span class="row">Rythme doux</span>
+          <span class="row">Numbers up to 20</span>
+          <span class="row">Few enemies</span>
+          <span class="row">Gentle pace</span>
         </button>
         <button class="diffBtn" data-diff="medium">
-          <span class="title">MOYEN</span>
+          <span class="title">MEDIUM</span>
           <span class="key">3</span>
-          <span class="row">Nombres jusqu'à 50</span>
-          <span class="row">Plus d'ennemis</span>
-          <span class="row">Plus rapide</span>
+          <span class="row">Numbers up to 50</span>
+          <span class="row">More enemies</span>
+          <span class="row">Faster</span>
         </button>
         <button class="diffBtn" data-diff="hard">
-          <span class="title">DIFFICILE</span>
+          <span class="title">HARD</span>
           <span class="key">4</span>
-          <span class="row">Nombres jusqu'à 100</span>
-          <span class="row">Écran chargé</span>
-          <span class="row">Très rapide</span>
+          <span class="row">Numbers up to 100</span>
+          <span class="row">Busy screen</span>
+          <span class="row">Very fast</span>
         </button>
       </div>
 
       <div id="trainingSection">
-        <h3>ENTRAÎNEMENT (optionnel)</h3>
-        <p>Sélectionne un ou plusieurs nombres, puis choisis la difficulté.</p>
+        <h3>TRAINING (optional)</h3>
+        <p>Pick one or more numbers, then choose a difficulty.</p>
         <div class="trainNumbers">
           <button class="trainBtn" data-num="1">1</button>
           <button class="trainBtn" data-num="2">2</button>
@@ -93,13 +96,13 @@
     </div>
 
     <div id="gameover" hidden>
-      <h1>Partie terminée</h1>
+      <h1>Game Over</h1>
       <p id="finalScore"></p>
       <div class="goBtns">
-        <button id="restartBtn">Rejouer</button>
-        <button id="changeDiffBtn">Changer la difficulté</button>
+        <button id="restartBtn">Play again</button>
+        <button id="changeDiffBtn">Change difficulty</button>
       </div>
-      <p class="kbdHint">ou appuie sur <kbd>R</kbd> pour recommencer</p>
+      <p class="kbdHint">or press <kbd>R</kbd> to restart</p>
     </div>
 
     <script src="./game.js"></script>

@@ -1,11 +1,15 @@
-f (() => {
+(() => {
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
   const livesEl = document.getElementById("lives");
-  const levelTextEl = document.getElementById("levelText");
-  const xpTextEl = document.getElementById("xpText");
+  const waveTextEl = document.getElementById("waveText");
   const xpFillEl = document.getElementById("xpFill");
-  const levelUpEl = document.getElementById("levelUp");
+  const waveAnnounceEl = document.getElementById("waveAnnounce");
+  const breatherEl = document.getElementById("breather");
+  const breatherCountEl = document.getElementById("breatherCount");
+  const streakEl = document.getElementById("streak");
+  const streakValueEl = document.getElementById("streakValue");
+  const streakMultEl = document.getElementById("streakMult");
   const gameOverEl = document.getElementById("gameover");
   const finalScoreEl = document.getElementById("finalScore");
   const inputValueEl = document.getElementById("inputValue");
@@ -20,23 +24,71 @@ f (() => {
   const trainingBadgeEl = document.getElementById("trainingBadge");
   const trainingNumEl = document.getElementById("trainingNum");
   const bossAlertEl = document.getElementById("bossAlert");
+  const inputBoxEl = document.getElementById("inputBox");
+  const chipBarEl = document.getElementById("chipBar");
 
   const PLAYER_RADIUS = 14;
   const MAX_LIVES = 3;
   const MAX_INPUT_LEN = 4;
+  const MAX_CHIPS = 6;
+  const CHIP_WRONG_LOCK = 0.35;
   const GRID_SIZE = 56;
   const LIFE_LOSS_WIPE_RADIUS = 320;
+
+  // ---------- lanes / waves / streak
+
+  const LANE_X_FRACTIONS = [0.22, 0.50, 0.78];
+  const NUM_LANES = LANE_X_FRACTIONS.length;
+  function laneX(lane) { return W * LANE_X_FRACTIONS[lane]; }
+
+  const BREATHER_DURATION = 4;    // seconds between waves
+  const BOSS_EVERY_N_WAVES = 3;
+
+  function isBossWave(wave) { return wave % BOSS_EVERY_N_WAVES === 0; }
+  function waveXpBudget(wave) {
+    if (isBossWave(wave)) return 0;
+    // grows ~12 XP per wave; e.g., w1=16, w2=28, w4=52, w5=64
+    return 4 + wave * 12;
+  }
+  function waveProgress() {
+    if (isBossWave(state.wave)) {
+      const boss = state.enemies.find((e) => e.type === "boss");
+      if (!boss) return 1.0;
+      return 1.0 - boss.hp / boss.maxHp;
+    }
+    const budget = waveXpBudget(state.wave);
+    if (budget <= 0) return 0;
+    return Math.min(1.0, state.waveXpEarned / budget);
+  }
+
+  // streak: [minCount, multiplier, cssTier]
+  const STREAK_TIERS = [
+    { min: 3,  mult: 2, tier: "tier2" },
+    { min: 10, mult: 3, tier: "tier3" },
+    { min: 20, mult: 5, tier: "tier4" },
+  ];
+  function streakMult() {
+    let m = 1;
+    for (const t of STREAK_TIERS) if (state.streak >= t.min) m = t.mult;
+    return m;
+  }
+  function streakTierClass() {
+    let cls = "";
+    for (const t of STREAK_TIERS) if (state.streak >= t.min) cls = t.tier;
+    return cls;
+  }
 
   // ---------- difficulties
 
   const DIFFICULTIES = {
     tresfacile: {
       maxNum: 12,
-      enemyCapAdd: 3,
+      enemyCapAdd: 1,
+      enemyCapMax: 3,
       speedMult: 0.50,
       spawnBase: 1.8,
       spawnDecay: 0.94,
-      spawnMin: 0.85,
+      spawnMin: 1.0,
       chargeMax: 10,
       simpleBoss: true,
       spawnTable: [
@@ -47,29 +99,32 @@ f (() => {
     },
     easy: {
       maxNum: 20,
-      enemyCapAdd: 3,
+      enemyCapAdd: 2,
+      enemyCapMax: 4,
       speedMult: 0.50,
       spawnBase: 1.8,
       spawnPerLevel: 0.10,
-      spawnMin: 0.85,
+      spawnMin: 1.0,
       chargeMax: 15,
     },
     medium: {
       maxNum: 50,
-      enemyCapAdd: 5,
+      enemyCapAdd: 3,
+      enemyCapMax: 5,
       speedMult: 0.70,
       spawnBase: 1.4,
       spawnPerLevel: 0.10,
-      spawnMin: 0.70,
+      spawnMin: 0.85,
       chargeMax: 30,
     },
     hard: {
       maxNum: 100,
-      enemyCapAdd: 7,
+      enemyCapAdd: 4,
+      enemyCapMax: 6,
       speedMult: 0.72,
       spawnBase: 1.4,
       spawnDecay: 0.95,
-      spawnMin: 0.75,
+      spawnMin: 0.85,
       chargeMax: 50,
     },
   };
@@ -150,8 +205,8 @@ f (() => {
       color: "#fbbf24", radius: 13, speed: 38, xp: 1, hp: 1,
       eq: (cap, target) => eqAdd(cap, target, 0.25, 2),
     },
-    money: {
-      color: "#fbbf24", radius: 14, speed: 0, xp: 4, hp: 1, lifetime: 8,
+    ice: {
+      color: "#7dd3fc", radius: 14, speed: 0, xp: 4, hp: 1, lifetime: 8,
       eq: (cap, target) => eqAdd(cap, target, 0.20, 2),
     },
     pink: {
@@ -191,11 +246,11 @@ f (() => {
   // weighted spawn table per level (last entry used for higher levels)
   const SPAWN_TABLE = [
     { yellow: 1 },                                                    // L1
-    { yellow: 4, money: 1 },                                          // L2
-    { yellow: 3, money: 1, pink: 2 },                                 // L3
-    { yellow: 2, money: 1, pink: 2, green: 2 },                       // L4
-    { yellow: 2, money: 1, pink: 2, green: 2, blue: 2 },              // L5
-    { yellow: 2, money: 1, pink: 2, green: 2, blue: 2, hexagon: 1 },  // L6+
+    { yellow: 4, ice: 1 },                                          // L2
+    { yellow: 3, ice: 1, pink: 2 },                                 // L3
+    { yellow: 2, ice: 1, pink: 2, green: 2 },                       // L4
+    { yellow: 2, ice: 1, pink: 2, green: 2, blue: 2 },              // L5
+    { yellow: 2, ice: 1, pink: 2, green: 2, blue: 2, hexagon: 1 },  // L6+
   ];
 
   function spawnTableForLevel(level, cfg) {
@@ -204,13 +259,27 @@ f (() => {
     return table[Math.max(0, i)];
   }
 
-  function pickType(level, cfg) {
+  function pickType(level, cfg, maxXp) {
     const t = spawnTableForLevel(level, cfg);
+    const usable = {};
     let total = 0;
-    for (const k in t) total += t[k];
-    let r = Math.random() * total;
     for (const k in t) {
-      r -= t[k];
+      if (maxXp == null || TYPES[k].xp <= maxXp) {
+        usable[k] = t[k];
+        total += t[k];
+      }
+    }
+    if (total === 0) {
+      // budget too small for anything in the table — fall back to the cheapest entry
+      let cheapest = null;
+      for (const k in t) {
+        if (cheapest === null || TYPES[k].xp < TYPES[cheapest].xp) cheapest = k;
+      }
+      return cheapest || "yellow";
+    }
+    let r = Math.random() * total;
+    for (const k in usable) {
+      r -= usable[k];
       if (r <= 0) return k;
     }
     return "yellow";
@@ -233,17 +302,25 @@ f (() => {
   // ---------- canvas sizing
 
   let W = 0, H = 0, dpr = 1;
+  let playerX = 0, playerY = 0;
   function resize() {
     dpr = window.devicePixelRatio || 1;
-    W = window.innerWidth;
-    H = window.innerHeight;
+    const rect = canvas.getBoundingClientRect();
+    W = rect.width || window.innerWidth;
+    H = rect.height || window.innerHeight;
     canvas.width = Math.floor(W * dpr);
     canvas.height = Math.floor(H * dpr);
-    canvas.style.width = W + "px";
-    canvas.style.height = H + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    playerX = W / 2;
+    // place the player just above the chip bar at the bottom
+    const offsetFromBottom = H < 520 ? 120 : 230;
+    playerY = H - offsetFromBottom;
   }
   window.addEventListener("resize", resize);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", resize);
+  }
   resize();
 
   // ---------- state
@@ -269,7 +346,19 @@ f (() => {
     charge: 0,
     bossesSpawned: 0,
     bossAlertTimer: 0,
+    chips: [],
+    chipLockTimer: 0,
+    wave: 1,
+    wavePhase: "active",   // "active" | "breather"
+    waveTimer: 0,
+    waveXpRemaining: 0,
+    waveXpEarned: 0,
+    streak: 0,
+    bestStreak: 0,
+    freezeTimer: 0,
   };
+
+  const FREEZE_DURATION = 3;
 
   function startGame(diffKey, opts = {}) {
     state.diffKey = diffKey;
@@ -292,6 +381,26 @@ f (() => {
     state.charge = 0;
     state.bossesSpawned = 0;
     state.bossAlertTimer = 0;
+    state.chips = [];
+    state.chipLockTimer = 0;
+    state.wave = 1;
+    state.wavePhase = "active";
+    state.waveTimer = 0;
+    state.waveXpRemaining = waveXpBudget(1);
+    state.waveXpEarned = 0;
+    state.streak = 0;
+    state.bestStreak = 0;
+    state.freezeTimer = 0;
+    announceWave();
+    if (isBossWave(state.wave)) {
+      state.bossesSpawned += 1;
+      spawnBoss(state.bossesSpawned);
+    }
+    rebuildChips();
+  }
+
+  function announceWave() {
+    state.levelUpTimer = 1.0;
   }
 
   function goToStart() {
@@ -302,46 +411,54 @@ f (() => {
     state.lasers = [];
     state.deaths = [];
     state.input = "";
+    state.chips = [];
+    rebuildChips();
   }
 
   function maxEnemiesForLevel(level) {
-    return level + (state.config ? state.config.enemyCapAdd : 3);
+    const cfg = state.config;
+    const add = cfg ? cfg.enemyCapAdd : 3;
+    const cap = cfg ? cfg.enemyCapMax : 5;
+    return Math.min(cap, level + add);
   }
 
-  // pick an x-coordinate in the outer thirds (left third or right third) so
-  // enemies spawning from top/bottom still have horizontal distance to travel
-  // on wide screens.
-  function randXOuterThirds() {
-    return Math.random() < 0.5
-      ? Math.random() * (W / 3)
-      : (W * 2 / 3) + Math.random() * (W / 3);
+  function pickLeastBusyLane() {
+    // pick the lane with the fewest live moving enemies (helps spread spawns)
+    const counts = new Array(NUM_LANES).fill(0);
+    for (const e of state.enemies) {
+      if (e.lane != null && e.speed > 0) counts[e.lane]++;
+    }
+    let best = 0, bestN = counts[0];
+    // add small randomness when tied
+    for (let i = 1; i < NUM_LANES; i++) {
+      if (counts[i] < bestN || (counts[i] === bestN && Math.random() < 0.4)) {
+        best = i; bestN = counts[i];
+      }
+    }
+    return best;
   }
 
-  function spawnEnemy() {
-    const type = pickType(state.level, state.config);
+  function spawnEnemy(maxXp) {
+    const type = pickType(state.level, state.config, maxXp);
     const spec = TYPES[type];
 
-    let x, y;
+    let lane, x, y;
     if (spec.speed === 0) {
-      const cx = W / 2, cy = H / 2;
-      let attempts = 0;
-      do {
-        x = 80 + Math.random() * (W - 160);
-        y = 80 + Math.random() * (H - 160);
-        attempts++;
-      } while (Math.hypot(x - cx, y - cy) < 220 && attempts < 12);
+      // stationary ice: pick a lane, place in the upper half
+      lane = Math.floor(Math.random() * NUM_LANES);
+      x = laneX(lane);
+      const topZoneBottom = Math.max(140, playerY * 0.55);
+      y = 80 + Math.random() * Math.max(40, topZoneBottom - 80);
     } else {
-      const edge = Math.floor(Math.random() * 4);
-      const m = spec.radius + 40;
-      if (edge === 0)      { x = randXOuterThirds(); y = -m; }
-      else if (edge === 1) { x = W + m;              y = Math.random() * H; }
-      else if (edge === 2) { x = randXOuterThirds(); y = H + m; }
-      else                 { x = -m;                 y = Math.random() * H; }
+      // moving enemies drop in from above in a lane
+      lane = pickLeastBusyLane();
+      x = laneX(lane);
+      y = -(spec.radius + 40);
     }
 
     const eq = spec.eq(state.config.maxNum, state.config.trainingTargets);
     const enemy = {
-      type, x, y,
+      type, x, y, lane,
       text: eq.text, answer: eq.answer,
       hp: spec.hp,
       maxHp: spec.hp,
@@ -352,6 +469,8 @@ f (() => {
     };
     if (spec.lifetime) enemy.timeLeft = spec.lifetime;
     state.enemies.push(enemy);
+    rebuildChips();
+    return spec.xp;
   }
 
   function spawnBoss(tier) {
@@ -391,35 +510,32 @@ f (() => {
     const color = BOSS_COLORS[Math.floor(Math.random() * BOSS_COLORS.length)];
     const xpReward = 50 * tier;
 
-    // boss enters only from the left or right edge
+    // boss drops in from above in the center lane
+    const lane = 1;
     const m = radius + 60;
-    const x = Math.random() < 0.5 ? -m : W + m;
-    const y = Math.random() * H;
+    const x = laneX(lane);
+    const y = -m;
 
     state.enemies.push({
       type: "boss",
       tier,
-      x, y,
+      x, y, lane,
       text: eq.text, answer: eq.answer,
       hp, maxHp: hp,
       radius, speed, color, xpReward,
       phase: 1,
     });
     state.bossAlertTimer = 1.5;
+    rebuildChips();
   }
 
   function gainXp(amount) {
-    state.xp += amount;
-    state.totalXp += amount;
+    const scaled = amount * streakMult();
+    state.xp += scaled;
+    state.totalXp += scaled;
     while (state.xp >= xpToNext(state.level)) {
       state.xp -= xpToNext(state.level);
       state.level += 1;
-      state.levelUpTimer = 1.0;
-      const expectedBosses = Math.floor(state.level / 10);
-      if (expectedBosses > state.bossesSpawned) {
-        state.bossesSpawned = expectedBosses;
-        spawnBoss(expectedBosses);
-      }
     }
   }
 
@@ -440,22 +556,23 @@ f (() => {
     state.enemies = [];
     state.charge = 0;
     state.shakeTimer = 0.3;
+    rebuildChips();
   }
 
-  function fireInput() {
-    if (state.input === "") return;
-    const answer = parseInt(state.input, 10);
-
+  function fireAnswer(answer) {
     const matches = [];
     for (let i = 0; i < state.enemies.length; i++) {
       if (state.enemies[i].answer === answer) matches.push(i);
     }
 
     if (matches.length === 0) {
-      state.input = "";
       state.shakeTimer = 0.35;
-      return;
+      state.streak = 0;
+      return false;
     }
+
+    state.streak += 1;
+    if (state.streak > state.bestStreak) state.bestStreak = state.streak;
 
     for (let k = matches.length - 1; k >= 0; k--) {
       const idx = matches[k];
@@ -477,7 +594,9 @@ f (() => {
         });
         state.enemies.splice(idx, 1);
         gainXp(e.xpReward);
+        state.waveXpEarned += e.xpReward;
         if (state.charge < state.config.chargeMax) state.charge += 1;
+        if (e.type === "ice") state.freezeTimer = FREEZE_DURATION;
       } else {
         let eq;
         if (e.type === "boss") {
@@ -495,22 +614,164 @@ f (() => {
         e.answer = eq.answer;
       }
     }
+    rebuildChips();
+    return true;
+  }
+
+  function fireInput() {
+    if (state.input === "") return;
+    const answer = parseInt(state.input, 10);
+    fireAnswer(answer);
     state.input = "";
+  }
+
+  // ---------- chip-based input (mobile)
+
+  function rebuildChips() {
+    if (!state.started || state.gameOver) {
+      state.chips = [];
+      renderChips();
+      return;
+    }
+    // collect unique enemy answers, prioritizing nearest threats
+    const sorted = state.enemies.slice().sort((a, b) => {
+      return Math.hypot(a.x - playerX, a.y - playerY) - Math.hypot(b.x - playerX, b.y - playerY);
+    });
+    const wanted = [];
+    const wantedSet = new Set();
+    for (const e of sorted) {
+      if (wantedSet.has(e.answer)) continue;
+      wantedSet.add(e.answer);
+      wanted.push(e.answer);
+      if (wanted.length >= MAX_CHIPS) break;
+    }
+
+    const cap = Math.max(20, (state.config?.maxNum || 20) * 2);
+
+    // start from current chips to preserve positions
+    const chips = state.chips.slice();
+    while (chips.length < MAX_CHIPS) chips.push(null);
+    chips.length = MAX_CHIPS;
+
+    // step 1: free slots whose value isn't wanted (and isn't an enemy answer)
+    const stillNeeded = new Set(wanted);
+    for (let i = 0; i < MAX_CHIPS; i++) {
+      if (chips[i] != null && stillNeeded.has(chips[i])) {
+        stillNeeded.delete(chips[i]);
+      }
+    }
+    // step 2: place stillNeeded into slots that don't currently hold a wanted value
+    const toFill = Array.from(stillNeeded);
+    for (let i = 0; i < MAX_CHIPS && toFill.length > 0; i++) {
+      if (chips[i] != null && wantedSet.has(chips[i])) continue;
+      chips[i] = toFill.shift();
+    }
+    // step 3: fill any nulls with distractors (avoid duplicates)
+    for (let i = 0; i < MAX_CHIPS; i++) {
+      if (chips[i] != null) continue;
+      let cand;
+      let guard = 0;
+      do {
+        cand = randInt(1, cap);
+        guard++;
+      } while (chips.includes(cand) && guard < 200);
+      chips[i] = cand;
+    }
+
+    state.chips = chips;
+    renderChips();
+  }
+
+  function initChipDOM() {
+    chipBarEl.innerHTML = "";
+    for (let i = 0; i < MAX_CHIPS; i++) {
+      const btn = document.createElement("button");
+      btn.className = "chip";
+      btn.type = "button";
+      btn.dataset.index = String(i);
+      btn.addEventListener("pointerdown", (ev) => {
+        ev.preventDefault();
+        onChip(btn, i);
+      });
+      chipBarEl.appendChild(btn);
+    }
+  }
+
+  function renderChips() {
+    const visible = state.started && !state.gameOver && state.chips.length > 0;
+    chipBarEl.hidden = !visible;
+    if (!visible) return;
+    const children = chipBarEl.children;
+    for (let i = 0; i < MAX_CHIPS; i++) {
+      const node = children[i];
+      if (!node) continue;
+      const value = state.chips[i];
+      if (node.textContent !== String(value)) node.textContent = String(value);
+    }
+  }
+
+  function onChip(btn, index) {
+    if (!state.started || state.gameOver || state.paused) return;
+    if (state.chipLockTimer > 0) return;
+    const value = state.chips[index];
+    if (value == null) return;
+    const hit = fireAnswer(value);
+    if (hit) {
+      btn.classList.add("right");
+      setTimeout(() => btn.classList.remove("right"), 180);
+    } else {
+      btn.classList.add("wrong");
+      state.chipLockTimer = CHIP_WRONG_LOCK;
+      setTimeout(() => btn.classList.remove("wrong"), 320);
+    }
   }
 
   // ---------- update
 
+  function advanceWave() {
+    state.wave += 1;
+    state.wavePhase = "active";
+    state.waveTimer = 0;
+    state.waveXpRemaining = waveXpBudget(state.wave);
+    state.waveXpEarned = 0;
+    announceWave();
+    if (isBossWave(state.wave)) {
+      state.bossesSpawned += 1;
+      spawnBoss(state.bossesSpawned);
+    }
+  }
+
   function update(dt) {
     if (!state.started || state.gameOver || state.paused) return;
 
-    const bossAlive = state.enemies.some((e) => e.type === "boss");
+    const frozen = state.freezeTimer > 0;
+    if (frozen) state.freezeTimer = Math.max(0, state.freezeTimer - dt);
 
-    state.spawnTimer -= dt;
-    if (state.spawnTimer <= 0) {
-      if (!bossAlive && state.enemies.length < maxEnemiesForLevel(state.level)) {
-        spawnEnemy();
+    const bossAlive = state.enemies.some((e) => e.type === "boss");
+    const stillSpawning = state.waveXpRemaining > 0 && !isBossWave(state.wave);
+    const waveCleared = !stillSpawning && state.enemies.length === 0;
+
+    // wave phase machine (breather is allowed to tick during freeze so the freeze
+    // doesn't stretch the inter-wave gap; new active-phase spawns are gated below)
+    if (state.wavePhase === "active" && waveCleared) {
+      state.wavePhase = "breather";
+      state.waveTimer = BREATHER_DURATION;
+    } else if (state.wavePhase === "breather") {
+      state.waveTimer -= dt;
+      if (state.waveTimer <= 0) advanceWave();
+    }
+
+    const canSpawn = state.wavePhase === "active" && stillSpawning && !bossAlive && !frozen;
+
+    if (!frozen) {
+      state.spawnTimer -= dt;
+      if (state.spawnTimer <= 0) {
+        if (canSpawn && state.enemies.length < maxEnemiesForLevel(state.level)) {
+          const cost = spawnEnemy(state.waveXpRemaining);
+          state.waveXpRemaining = Math.max(0, state.waveXpRemaining - cost);
+        }
+        state.spawnTimer = spawnIntervalForLevel(state.level, state.config);
       }
-      state.spawnTimer = spawnIntervalForLevel(state.level, state.config);
     }
 
     for (let i = state.lasers.length - 1; i >= 0; i--) {
@@ -522,19 +783,17 @@ f (() => {
       if (state.deaths[i].life <= 0) state.deaths.splice(i, 1);
     }
 
-    const cx = W / 2, cy = H / 2;
-
     for (let i = state.enemies.length - 1; i >= 0; i--) {
       const e = state.enemies[i];
       const spec = TYPES[e.type];
 
       if (spec.lifetime) {
-        e.timeLeft -= dt;
+        if (!frozen) e.timeLeft -= dt;
         if (e.timeLeft <= 0) {
           state.enemies.splice(i, 1);
           continue;
         }
-      } else {
+      } else if (!frozen) {
         // boss enrage at half HP — gets faster, equation gets harder
         if (e.type === "boss" && e.phase === 1 && e.hp <= e.maxHp / 2) {
           e.phase = 2;
@@ -543,15 +802,18 @@ f (() => {
           state.shakeTimer = 0.25;
         }
 
-        const dx = cx - e.x, dy = cy - e.y;
-        const dist = Math.hypot(dx, dy) || 1;
+        // straight-down lane movement
         const v = e.speed * state.config.speedMult * levelSpeedFactor(state.level);
-        e.x += (dx / dist) * v * dt;
-        e.y += (dy / dist) * v * dt;
+        e.y += v * dt;
+        // gentle x easing back toward lane center (in case of any drift)
+        const targetX = laneX(e.lane != null ? e.lane : 1);
+        e.x += (targetX - e.x) * Math.min(1, dt * 4);
 
-        if (dist < PLAYER_RADIUS + e.radius * 0.7) {
+        // collision: enemy crosses the danger line
+        if (e.y + e.radius * 0.4 >= playerY) {
           state.enemies.splice(i, 1);
           state.lives -= 1;
+          state.streak = 0;
           state.flashTimer = 0.4;
           state.shakeTimer = 0.4;
 
@@ -559,7 +821,7 @@ f (() => {
           const r2 = LIFE_LOSS_WIPE_RADIUS * LIFE_LOSS_WIPE_RADIUS;
           for (let j = state.enemies.length - 1; j >= 0; j--) {
             const ne = state.enemies[j];
-            const ddx = ne.x - cx, ddy = ne.y - cy;
+            const ddx = ne.x - playerX, ddy = ne.y - playerY;
             if (ddx * ddx + ddy * ddy <= r2) {
               state.deaths.push({
                 x: ne.x, y: ne.y,
@@ -573,8 +835,9 @@ f (() => {
 
           if (state.lives <= 0) {
             state.gameOver = true;
-            finalScoreEl.textContent = `Niveau atteint : ${state.level}`;
+            finalScoreEl.textContent = `Wave reached: ${state.wave} · Best streak: ${state.bestStreak}`;
           }
+          rebuildChips();
           break;
         }
       }
@@ -584,6 +847,7 @@ f (() => {
     if (state.shakeTimer > 0) state.shakeTimer -= dt;
     if (state.levelUpTimer > 0) state.levelUpTimer -= dt;
     if (state.bossAlertTimer > 0) state.bossAlertTimer -= dt;
+    if (state.chipLockTimer > 0) state.chipLockTimer -= dt;
   }
 
   // ---------- render
@@ -703,20 +967,23 @@ f (() => {
     ctx.lineWidth = spec.shape === "boss" ? 3 : 2;
     ctx.stroke();
 
-    // money lifetime ring + $ symbol
+    // ice lifetime ring + snowflake symbol
     if (spec.lifetime) {
       const frac = Math.max(0, e.timeLeft / spec.lifetime);
       ctx.beginPath();
       ctx.arc(e.x, e.y, e.radius + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
-      ctx.strokeStyle = frac < 0.3 ? "#f87171" : "rgba(251, 191, 36, 0.7)";
+      ctx.strokeStyle = frac < 0.3 ? "#f87171" : "rgba(125, 211, 252, 0.75)";
       ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      ctx.font = "bold 14px ui-monospace, monospace";
+      ctx.font = "bold 16px ui-monospace, monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "#fbbf24";
-      ctx.fillText("€", e.x, e.y + 1);
+      ctx.fillStyle = "#e0f2fe";
+      ctx.shadowColor = "#7dd3fc";
+      ctx.shadowBlur = 8;
+      ctx.fillText("❄", e.x, e.y + 1);
+      ctx.shadowBlur = 0;
     }
 
     // hp hearts for hexagon
@@ -757,11 +1024,38 @@ f (() => {
     drawEqLabel(e.x, e.y - e.radius - 8, e.text, color);
   }
 
+  function drawLanesAndDangerLine() {
+    if (!state.started) return;
+    // lane guides — very subtle vertical strips
+    ctx.save();
+    ctx.globalAlpha = 0.06;
+    ctx.fillStyle = "#67e8f9";
+    const laneW = Math.min(160, W / 4);
+    for (let i = 0; i < NUM_LANES; i++) {
+      const cx = laneX(i);
+      ctx.fillRect(cx - laneW / 2, 0, laneW, playerY);
+    }
+    ctx.restore();
+
+    // danger line at the player's y
+    const lineY = playerY;
+    ctx.save();
+    const pulse = 0.45 + 0.25 * Math.sin(performance.now() / 380);
+    ctx.strokeStyle = `rgba(239, 68, 68, ${pulse * 0.55})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, lineY);
+    ctx.lineTo(W, lineY);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function render() {
     ctx.fillStyle = state.flashTimer > 0 ? "#3a0a14" : "#0a0a14";
     ctx.fillRect(0, 0, W, H);
 
     drawGrid();
+    drawLanesAndDangerLine();
 
     let shakeX = 0, shakeY = 0;
     if (state.shakeTimer > 0) {
@@ -772,19 +1066,17 @@ f (() => {
     ctx.save();
     ctx.translate(shakeX, shakeY);
 
-    const cx = W / 2, cy = H / 2;
-
     // player
     ctx.shadowColor = "#38bdf8";
     ctx.shadowBlur = 20;
     ctx.fillStyle = "#7dd3fc";
     ctx.beginPath();
-    ctx.arc(cx, cy, PLAYER_RADIUS, 0, Math.PI * 2);
+    ctx.arc(playerX, playerY, PLAYER_RADIUS, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.fillStyle = "#bae6fd";
     ctx.beginPath();
-    ctx.arc(cx - 3, cy - 3, PLAYER_RADIUS * 0.4, 0, Math.PI * 2);
+    ctx.arc(playerX - 3, playerY - 3, PLAYER_RADIUS * 0.4, 0, Math.PI * 2);
     ctx.fill();
 
     // lasers behind enemies
@@ -798,7 +1090,7 @@ f (() => {
       ctx.lineWidth = 2 + 5 * t;
       ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(cx, cy);
+      ctx.moveTo(playerX, playerY);
       ctx.lineTo(l.x, l.y);
       ctx.stroke();
       ctx.restore();
@@ -824,24 +1116,84 @@ f (() => {
 
     ctx.restore();
 
+    // freeze overlay
+    if (state.freezeTimer > 0) {
+      const fade = Math.min(1, state.freezeTimer / 0.4);
+      ctx.save();
+      ctx.fillStyle = `rgba(125, 211, 252, ${0.16 * fade})`;
+      ctx.fillRect(0, 0, W, H);
+      // frosty edges
+      const edge = 60;
+      const grad = ctx.createLinearGradient(0, 0, 0, edge);
+      grad.addColorStop(0, `rgba(186, 230, 253, ${0.55 * fade})`);
+      grad.addColorStop(1, "rgba(186, 230, 253, 0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, edge);
+      const grad2 = ctx.createLinearGradient(0, H - edge, 0, H);
+      grad2.addColorStop(0, "rgba(186, 230, 253, 0)");
+      grad2.addColorStop(1, `rgba(186, 230, 253, ${0.55 * fade})`);
+      ctx.fillStyle = grad2;
+      ctx.fillRect(0, H - edge, W, edge);
+
+      // countdown text
+      ctx.font = "bold 22px ui-monospace, Menlo, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = `rgba(224, 242, 254, ${0.9 * fade})`;
+      ctx.shadowColor = "#7dd3fc";
+      ctx.shadowBlur = 14;
+      ctx.fillText(`❄ ${state.freezeTimer.toFixed(1)}s`, W / 2, 120);
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+
     // HUD
     livesEl.textContent = "♥".repeat(state.lives) + "♡".repeat(MAX_LIVES - state.lives);
-    levelTextEl.innerHTML = `Niv : <b>${state.level}</b>`;
-    xpTextEl.innerHTML = `<span class="xpIcon">⬢</span> <b>${state.totalXp}</b>`;
-    xpFillEl.style.width = `${(state.xp / xpToNext(state.level)) * 100}%`;
+    waveTextEl.innerHTML = `Wave <b>${state.wave}</b>`;
+    xpFillEl.style.width = `${(waveProgress() * 100).toFixed(1)}%`;
     startScreenEl.hidden = state.started;
     gameOverEl.hidden = !state.gameOver;
-    levelUpEl.hidden = state.levelUpTimer <= 0;
     bossAlertEl.hidden = state.bossAlertTimer <= 0;
     pausedEl.hidden = !state.paused;
 
+    // wave announce flashes the new wave number when levelUpTimer is active
+    if (state.levelUpTimer > 0) {
+      waveAnnounceEl.textContent = `WAVE ${state.wave}`;
+      waveAnnounceEl.hidden = false;
+    } else {
+      waveAnnounceEl.hidden = true;
+    }
+
+    // breather overlay
+    if (state.started && !state.gameOver && state.wavePhase === "breather") {
+      breatherEl.hidden = false;
+      breatherCountEl.textContent = String(Math.max(1, Math.ceil(state.waveTimer)));
+    } else {
+      breatherEl.hidden = true;
+    }
+
+    // streak chip
+    if (state.streak >= 2) {
+      streakEl.hidden = false;
+      streakValueEl.textContent = String(state.streak);
+      const mult = streakMult();
+      streakMultEl.textContent = mult > 1 ? `×${mult}` : "";
+      streakEl.className = "";
+      const tier = streakTierClass();
+      if (tier) streakEl.classList.add(tier);
+    } else {
+      streakEl.hidden = true;
+    }
+
     if (state.config) {
       if (state.charge >= state.config.chargeMax) {
-        chargeValEl.textContent = "PRÊT [Espace]";
+        chargeValEl.textContent = "READY";
         chargeEl.className = "ready";
+        chargeEl.disabled = false;
       } else {
         chargeValEl.textContent = `${state.charge}/${state.config.chargeMax}`;
         chargeEl.className = "";
+        chargeEl.disabled = true;
       }
       if (state.config.trainingTargets && state.config.trainingTargets.length) {
         trainingNumEl.textContent = state.config.trainingTargets.join(", ");
@@ -851,18 +1203,21 @@ f (() => {
       }
     } else {
       trainingBadgeEl.hidden = true;
+      chargeEl.disabled = true;
     }
 
     if (state.input === "") {
-      inputValueEl.textContent = "_";
-      inputValueEl.className = "empty";
+      inputBoxEl.hidden = true;
     } else {
+      inputBoxEl.hidden = false;
       inputValueEl.textContent = state.input;
       inputValueEl.className = "";
     }
   }
 
   // ---------- main loop
+
+  initChipDOM();
 
   let last = performance.now();
   function loop(now) {
@@ -943,6 +1298,12 @@ f (() => {
 
   diffBtnEls.forEach((btn) => {
     btn.addEventListener("click", () => startGame(btn.dataset.diff, selectionOpts()));
+  });
+
+  chargeEl.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    if (!state.started || state.gameOver || state.paused) return;
+    fireCharge();
   });
 
   restartBtnEl.addEventListener("click", () => {
