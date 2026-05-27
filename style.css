@@ -4,20 +4,37 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #0a0a14;
+  background: #050510;
   color: #e2e8f0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   user-select: none;
 }
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* iPhone-portrait stage: fits the viewport while preserving 9:19.5 ratio.
+   On wide desktops the play area becomes a centered vertical strip; on a
+   phone in portrait it fills the screen. */
+#stage {
+  position: relative;
+  width: min(100vw, calc(100dvh * 9 / 19.5));
+  height: min(100dvh, calc(100vw * 19.5 / 9));
+  background: #0a0a14;
+  overflow: hidden;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
+}
 
 #game {
   display: block;
-  width: 100vw;
-  height: 100dvh;
+  width: 100%;
+  height: 100%;
 }
 
 #hud {
-  position: fixed;
+  position: absolute;
   top: 12px;
   left: 16px;
   right: 16px;
@@ -72,7 +89,7 @@ html, body {
 #xpText .xpIcon { color: #38bdf8; }
 
 #xpBar {
-  position: fixed;
+  position: absolute;
   top: 50px;
   left: 16px;
   right: 16px;
@@ -137,7 +154,7 @@ html, body {
 }
 
 #waveAnnounce {
-  position: fixed;
+  position: absolute;
   top: 80px;
   left: 50%;
   transform: translateX(-50%);
@@ -152,7 +169,7 @@ html, body {
 #waveAnnounce[hidden] { display: none; }
 
 #breather {
-  position: fixed;
+  position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
@@ -182,7 +199,7 @@ html, body {
 }
 
 #streak {
-  position: fixed;
+  position: absolute;
   top: 64px;
   left: 50%;
   transform: translateX(-50%);
@@ -223,7 +240,7 @@ html, body {
 }
 
 #bossAlert {
-  position: fixed;
+  position: absolute;
   top: 110px;
   left: 50%;
   transform: translateX(-50%);
@@ -244,7 +261,7 @@ html, body {
 }
 
 #chipBar {
-  position: fixed;
+  position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
@@ -300,7 +317,7 @@ html, body {
 }
 
 #inputBox {
-  position: fixed;
+  position: absolute;
   left: 50%;
   bottom: 30%;
   transform: translateX(-50%);
@@ -340,7 +357,7 @@ html, body {
 }
 
 #gameover {
-  position: fixed;
+  position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
@@ -386,7 +403,7 @@ html, body {
 .kbdHint { font-size: 12px; opacity: 0.5; margin-top: 4px; }
 
 #startScreen {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 100;
   display: flex;
@@ -541,7 +558,7 @@ html, body {
 #trainingBadge b { color: #fff; }
 
 #paused {
-  position: fixed;
+  position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
