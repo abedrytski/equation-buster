@@ -640,7 +640,7 @@
 
     const hp = simple
       ? 2 + tier + randInt(0, 1)
-      : 3 + tier * 2 + randInt(0, 1);
+      : 2 + tier * 2 + randInt(0, 1);
     const speed = 14 + tier * 3;
     const radius = 50 + tier * 10;
     const color = BOSS_COLORS[Math.floor(Math.random() * BOSS_COLORS.length)];
