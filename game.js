@@ -656,7 +656,7 @@
     const hp = simple
       ? 2 + tier + randInt(0, 1)
       : 1 + tier * 2 + randInt(0, 1);
-    const speed = 14 + tier * 3;
+    const speed = 8 + tier * 2;
     const radius = 50 + tier * 10;
     const color = BOSS_COLORS[Math.floor(Math.random() * BOSS_COLORS.length)];
     const xpReward = 50 * tier;
