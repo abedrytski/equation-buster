@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
     <meta name="theme-color" content="#0a0a14" />
-    <title>Math Survivor</title>
+    <title>Equations Buster</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -15,7 +15,6 @@
     <div id="hud">
       <div id="hudLeft">
         <span id="waveText">Wave <b>1</b></span>
-        <span id="trainingBadge" hidden>Training: <b id="trainingNum">—</b></span>
       </div>
       <div id="scoreHud">
         <span id="scoreValue">0</span>
@@ -25,7 +24,11 @@
         <button id="muteBtn" type="button" aria-label="mute music">🔊</button>
       </div>
     </div>
-    <div id="xpBar"><div id="xpFill"></div></div>
+    <div id="xpBar">
+      <div id="xpFill"></div>
+      <div class="waveTick tick1"></div>
+      <div class="waveTick tick2"></div>
+    </div>
 
     <div id="streak" hidden><span id="streakLabel">STREAK</span> <b id="streakValue">0</b><span id="streakMult">×2</span></div>
 
@@ -46,54 +49,12 @@
     <div id="chipBar" hidden></div>
 
     <div id="startScreen">
-      <h1>MATH SURVIVOR</h1>
-      <p class="subtitle">Choose difficulty</p>
-      <div class="diffOptions">
-        <button class="diffBtn" data-diff="tresfacile">
-          <span class="title">VERY EASY</span>
-          <span class="key">1</span>
-          <span class="row">Numbers up to 12</span>
-          <span class="row">Yellow targets only</span>
-          <span class="row">And a few pink</span>
-        </button>
-        <button class="diffBtn" data-diff="easy">
-          <span class="title">EASY</span>
-          <span class="key">2</span>
-          <span class="row">Numbers up to 20</span>
-          <span class="row">Few enemies</span>
-          <span class="row">Gentle pace</span>
-        </button>
-        <button class="diffBtn" data-diff="medium">
-          <span class="title">MEDIUM</span>
-          <span class="key">3</span>
-          <span class="row">Numbers up to 50</span>
-          <span class="row">More enemies</span>
-          <span class="row">Faster</span>
-        </button>
-        <button class="diffBtn" data-diff="hard">
-          <span class="title">HARD</span>
-          <span class="key">4</span>
-          <span class="row">Numbers up to 100</span>
-          <span class="row">Busy screen</span>
-          <span class="row">Very fast</span>
-        </button>
-      </div>
-
-      <div id="trainingSection">
-        <h3>TRAINING (optional)</h3>
-        <p>Pick one or more numbers, then choose a difficulty.</p>
-        <div class="trainNumbers">
-          <button class="trainBtn" data-num="1">1</button>
-          <button class="trainBtn" data-num="2">2</button>
-          <button class="trainBtn" data-num="3">3</button>
-          <button class="trainBtn" data-num="4">4</button>
-          <button class="trainBtn" data-num="5">5</button>
-          <button class="trainBtn" data-num="6">6</button>
-          <button class="trainBtn" data-num="7">7</button>
-          <button class="trainBtn" data-num="8">8</button>
-          <button class="trainBtn" data-num="9">9</button>
-          <button class="trainBtn" data-num="10">10</button>
-        </div>
+      <h1>EQUATIONS BUSTER</h1>
+      <button id="startBtn" type="button">START</button>
+      <div id="diffPicker">
+        <button class="diffBtn" data-diff="easy">EASY</button>
+        <button class="diffBtn selected" data-diff="medium">MEDIUM</button>
+        <button class="diffBtn" data-diff="hard">HARD</button>
       </div>
     </div>
 

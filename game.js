@@ -4,6 +4,8 @@
   const livesEl = document.getElementById("lives");
   const waveTextEl = document.getElementById("waveText");
   const xpFillEl = document.getElementById("xpFill");
+  const tick1El = document.querySelector(".tick1");
+  const tick2El = document.querySelector(".tick2");
   const waveAnnounceEl = document.getElementById("waveAnnounce");
   const breatherEl = document.getElementById("breather");
   const breatherCountEl = document.getElementById("breatherCount");
@@ -20,9 +22,7 @@
   const restartBtnEl = document.getElementById("restartBtn");
   const changeDiffBtnEl = document.getElementById("changeDiffBtn");
   const diffBtnEls = document.querySelectorAll(".diffBtn");
-  const trainBtnEls = document.querySelectorAll(".trainBtn");
-  const trainingBadgeEl = document.getElementById("trainingBadge");
-  const trainingNumEl = document.getElementById("trainingNum");
+  const startBtnEl = document.getElementById("startBtn");
   const bossAlertEl = document.getElementById("bossAlert");
   const inputBoxEl = document.getElementById("inputBox");
   const chipBarEl = document.getElementById("chipBar");
@@ -53,8 +53,16 @@
   function waveXpBudget(wave) {
     if (isBossWave(wave)) return 0;
     // grows ~12 XP per wave; e.g., w1=16, w2=28, w4=52, w5=64
-    return 4 + wave * 12;
+    return 4 + wave * 8;
   }
+  // progress across the full cycle of (BOSS_EVERY_N_WAVES - 1) regular waves
+  // + 1 boss wave. Resets to 0 at the start of each new cycle (after a boss).
+  function cycleProgress() {
+    const cyclePos = (state.wave - 1) % BOSS_EVERY_N_WAVES;  // 0..N-1
+    const seg = 1 / BOSS_EVERY_N_WAVES;
+    return Math.min(1, cyclePos * seg + waveProgress() * seg);
+  }
+
   function waveProgress() {
     if (isBossWave(state.wave)) {
       const boss = state.enemies.find((e) => e.type === "boss");
@@ -250,7 +258,7 @@
       eq: (cap, target) => eqAdd3(cap, target, 0.20, 2),
     },
     boss: {
-      color: "#a78bfa", radius: 40, speed: 18, xp: 50, hp: 4, shape: "boss",
+      color: "#a78bfa", radius: 40, speed: 18, xp: 50, hp: 3, shape: "boss",
     },
     mini: {
       color: "#a78bfa", radius: 18, speed: 0, xp: 6, hp: 1, shape: "mini",
@@ -267,7 +275,6 @@
   // weighted spawn table per wave (last entry used for higher waves)
   const SPAWN_TABLE = [
     { yellow: 1 },                                                    // W1
-    { yellow: 4, ice: 1 },                                          // W2
     { yellow: 3, ice: 1, pink: 2 },                                 // W3
     { yellow: 2, ice: 1, pink: 2, green: 2 },                       // W4
     { yellow: 2, ice: 1, pink: 2, green: 2, blue: 2 },              // W5
@@ -394,7 +401,7 @@
     wrongFlashTimer: 0,
     score: 0,
     scorePopTimer: 0,
-    musicStarted: false,
+    musicCurrentTrack: "none",
     musicMuted: false,
   };
 
@@ -441,46 +448,56 @@
       spawnBoss(state.bossesSpawned);
     }
     rebuildChips();
-    ensureMusicStarted();
+    primeAudio();
+    updateMusic();
   }
 
   // ---------- music
+  // Only one track plays at a time (iOS Safari ignores audio.volume, so a
+  // crossfade approach plays both tracks at full system volume). We pause one
+  // and play the other on transitions. Default is muted; user opts in via the
+  // 🔊 button, and the choice persists in localStorage.
 
   const MUSIC_BG_VOL = 0.45;
   const MUSIC_BOSS_VOL = 0.55;
-  const MUSIC_FADE_RATE = 1.6; // volume per second toward target
+  let audioPrimed = false;
 
-  function ensureMusicStarted() {
-    // call after a user gesture; safe to call repeatedly
-    if (state.musicStarted) return;
-    bgmEl.volume = 0;
-    bossBgmEl.volume = 0;
-    const p1 = bgmEl.play();
-    const p2 = bossBgmEl.play();
-    if (p1 && p1.catch) p1.catch(() => {});
-    if (p2 && p2.catch) p2.catch(() => {});
-    state.musicStarted = true;
+  function primeAudio() {
+    // Must be called from inside a user-gesture handler. Briefly plays each
+    // element muted, then pauses, so subsequent .play() calls (e.g. when the
+    // boss appears mid-game, outside any gesture) are allowed on iOS.
+    if (audioPrimed) return;
+    audioPrimed = true;
+    for (const el of [bgmEl, bossBgmEl]) {
+      el.muted = true;
+      const p = el.play();
+      if (p && p.catch) p.catch(() => {});
+      el.pause();
+      el.muted = false;
+    }
   }
 
-  function musicTargets() {
-    // returns [bgTarget, bossTarget] in [0, 1]
-    if (state.musicMuted) return [0, 0];
-    if (!state.started || state.gameOver || state.paused) return [0, 0];
-    const bossAlive = state.enemies.some((e) => e.type === "boss");
-    return bossAlive ? [0, MUSIC_BOSS_VOL] : [MUSIC_BG_VOL, 0];
+  function desiredTrack() {
+    if (state.musicMuted) return "none";
+    if (!state.started || state.gameOver || state.paused) return "none";
+    return state.enemies.some((e) => e.type === "boss") ? "boss" : "bg";
   }
 
-  function approach(curr, target, step) {
-    if (curr < target) return Math.min(target, curr + step);
-    if (curr > target) return Math.max(target, curr - step);
-    return curr;
-  }
-
-  function updateMusic(dt) {
-    const [bgT, bossT] = musicTargets();
-    const step = MUSIC_FADE_RATE * dt;
-    bgmEl.volume = approach(bgmEl.volume, bgT, step);
-    bossBgmEl.volume = approach(bossBgmEl.volume, bossT, step);
+  function updateMusic() {
+    const desired = desiredTrack();
+    if (desired === state.musicCurrentTrack) return;
+    if (state.musicCurrentTrack === "bg") bgmEl.pause();
+    else if (state.musicCurrentTrack === "boss") bossBgmEl.pause();
+    if (desired === "bg") {
+      bgmEl.volume = MUSIC_BG_VOL;
+      const p = bgmEl.play();
+      if (p && p.catch) p.catch(() => {});
+    } else if (desired === "boss") {
+      bossBgmEl.volume = MUSIC_BOSS_VOL;
+      const p = bossBgmEl.play();
+      if (p && p.catch) p.catch(() => {});
+    }
+    state.musicCurrentTrack = desired;
   }
 
   function setMuted(muted) {
@@ -490,12 +507,13 @@
     muteBtnEl.textContent = muted ? "🔇" : "🔊";
   }
 
-  // restore mute preference; bind toggle
-  try { state.musicMuted = localStorage.getItem("ms_muted") === "1"; } catch (_) { /* ignore */ }
+  // Default: muted. Only an explicit "0" in storage means "user opted in".
+  try { state.musicMuted = localStorage.getItem("ms_muted") !== "0"; } catch (_) { /* ignore */ }
   setMuted(state.musicMuted);
   muteBtnEl.addEventListener("click", () => {
+    primeAudio();
     setMuted(!state.musicMuted);
-    ensureMusicStarted();
+    updateMusic();
   });
 
   function announceWave() {
@@ -1006,8 +1024,10 @@
           e.y = e.parent.y + Math.sin(e.orbitAngle) * e.orbitRadius;
         }
       } else if (!frozen) {
-        // boss enrage at half HP — gets faster, equation gets harder (mirrored phase 3)
-        if (e.type === "boss" && e.phase === 2 && e.hp <= e.maxHp / 2) {
+        // boss enrage after the first phase-2 hit — gets faster, equation gets
+        // harder (mirrored phase 3). Threshold is 2/3 of max HP so phase 2 stays
+        // short and the boss spends most of the fight in the dramatic phase 3.
+        if (e.type === "boss" && e.phase === 2 && e.hp <= e.maxHp * 2 / 3) {
           e.phase = 3;
           e.speed = e.speed * 1.4;
           state.flashTimer = 0.35;
@@ -1046,10 +1066,11 @@
               }
             }
           }
-          state.lives -= 1;
+          // a boss crossing the danger line is an instant kill
+          state.lives = e.type === "boss" ? 0 : state.lives - 1;
           state.streak = 0;
-          state.flashTimer = 0.4;
-          state.shakeTimer = 0.4;
+          state.flashTimer = e.type === "boss" ? 0.6 : 0.4;
+          state.shakeTimer = e.type === "boss" ? 0.6 : 0.4;
 
           // wipe nearby enemies (no XP) to give the player breathing room
           const r2 = LIFE_LOSS_WIPE_RADIUS * LIFE_LOSS_WIPE_RADIUS;
@@ -1452,7 +1473,10 @@
     // HUD
     livesEl.textContent = "♥".repeat(state.lives) + "♡".repeat(MAX_LIVES - state.lives);
     waveTextEl.innerHTML = `Wave <b>${state.wave}</b>`;
-    xpFillEl.style.width = `${(waveProgress() * 100).toFixed(1)}%`;
+    const cp = cycleProgress();
+    xpFillEl.style.clipPath = `inset(0 ${((1 - cp) * 100).toFixed(2)}% 0 0)`;
+    tick1El.classList.toggle("passed", cp >= 1 / 3);
+    tick2El.classList.toggle("passed", cp >= 2 / 3);
     startScreenEl.hidden = state.started;
     gameOverEl.hidden = !state.gameOver;
     bossAlertEl.hidden = state.bossAlertTimer <= 0;
@@ -1494,17 +1518,6 @@
     if (sTier) scoreHudEl.classList.add(sTier);
     if (state.scorePopTimer > 0) scoreHudEl.classList.add("pop");
 
-    if (state.config) {
-      if (state.config.trainingTargets && state.config.trainingTargets.length) {
-        trainingNumEl.textContent = state.config.trainingTargets.join(", ");
-        trainingBadgeEl.hidden = false;
-      } else {
-        trainingBadgeEl.hidden = true;
-      }
-    } else {
-      trainingBadgeEl.hidden = true;
-    }
-
     if (state.input === "") {
       inputBoxEl.hidden = true;
     } else {
@@ -1524,7 +1537,7 @@
     last = now;
     update(dt);
     render();
-    updateMusic(dt);
+    updateMusic();
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
@@ -1533,20 +1546,16 @@
 
   window.addEventListener("keydown", (ev) => {
     if (!state.started) {
-      const opts = selectionOpts();
-      if (ev.key === "1") startGame("tresfacile", opts);
-      else if (ev.key === "2") startGame("easy", opts);
-      else if (ev.key === "3") startGame("medium", opts);
-      else if (ev.key === "4") startGame("hard", opts);
+      if (ev.key === "Enter" || ev.key === " ") {
+        startGame(selectedDiff);
+        ev.preventDefault();
+      }
       return;
     }
 
     if (state.gameOver) {
       if (ev.key === "r" || ev.key === "R") {
-        const opts = state.config && state.config.trainingTargets
-          ? { trainingTargets: state.config.trainingTargets }
-          : {};
-        startGame(state.diffKey, opts);
+        startGame(state.diffKey);
       } else if (ev.key === "c" || ev.key === "C") {
         goToStart();
       }
@@ -1576,35 +1585,18 @@
     }
   });
 
-  const trainingSelection = new Set();
-  function selectionOpts() {
-    return trainingSelection.size
-      ? { trainingTargets: Array.from(trainingSelection).sort((a, b) => a - b) }
-      : {};
-  }
-
-  trainBtnEls.forEach((btn) => {
+  // selected difficulty on the start screen — clicking a diff button just
+  // selects it; the START button launches the game with whatever is selected
+  let selectedDiff = "medium";
+  diffBtnEls.forEach((btn) => {
     btn.addEventListener("click", () => {
-      const num = parseInt(btn.dataset.num, 10);
-      if (trainingSelection.has(num)) {
-        trainingSelection.delete(num);
-        btn.classList.remove("selected");
-      } else {
-        trainingSelection.add(num);
-        btn.classList.add("selected");
-      }
+      selectedDiff = btn.dataset.diff;
+      diffBtnEls.forEach((b) => b.classList.toggle("selected", b === btn));
     });
   });
 
-  diffBtnEls.forEach((btn) => {
-    btn.addEventListener("click", () => startGame(btn.dataset.diff, selectionOpts()));
-  });
+  startBtnEl.addEventListener("click", () => startGame(selectedDiff));
 
-  restartBtnEl.addEventListener("click", () => {
-    const opts = state.config && state.config.trainingTargets
-      ? { trainingTargets: state.config.trainingTargets }
-      : {};
-    startGame(state.diffKey, opts);
-  });
+  restartBtnEl.addEventListener("click", () => startGame(state.diffKey));
   changeDiffBtnEl.addEventListener("click", goToStart);
 })();

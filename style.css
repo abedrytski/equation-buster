@@ -100,23 +100,46 @@ body {
 
 #xpBar {
   position: absolute;
-  top: 50px;
+  top: 48px;
   left: 16px;
   right: 16px;
-  height: 3px;
+  height: 6px;
   background: rgba(56, 189, 248, 0.12);
-  border-radius: 2px;
-  overflow: hidden;
+  border-radius: 3px;
   pointer-events: none;
 }
 
 #xpFill {
-  height: 100%;
-  width: 0%;
-  background: #38bdf8;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  /* boss segment (last third) is red to telegraph what's coming */
+  background: linear-gradient(to right,
+    #38bdf8 0%, #38bdf8 66.66%,
+    #ef4444 66.66%, #ef4444 100%);
+  border-radius: 3px;
   box-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
-  transition: width 0.18s ease-out;
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.18s ease-out;
 }
+
+.waveTick {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  margin-top: -5px;
+  background: #0a0a14;
+  border: 2px solid #475569;
+  border-radius: 50%;
+  box-sizing: border-box;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.tick1 { left: 33.33%; }
+.tick2 { left: 66.66%; border-color: #b45309; }
+.waveTick.passed { background: #38bdf8; border-color: #67e8f9; }
+.tick2.passed { background: #ef4444; border-color: #fca5a5; box-shadow: 0 0 10px rgba(239, 68, 68, 0.6); }
 
 #lives {
   color: #ef4444;
@@ -397,145 +420,77 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 32px;
   background: rgba(10, 10, 20, 0.97);
   text-align: center;
+  padding-bottom: calc(max(env(safe-area-inset-bottom), 24px) + 100px);
 }
 #startScreen[hidden] { display: none; }
 
 #startScreen h1 {
-  font-size: 56px;
+  font-size: 32px;
   color: #67e8f9;
-  letter-spacing: 12px;
-  text-shadow: 0 0 32px rgba(103, 232, 249, 0.6);
-}
-#startScreen .subtitle {
-  color: #94a3b8;
   letter-spacing: 4px;
-  font-size: 13px;
-  margin-bottom: 24px;
+  text-shadow: 0 0 32px rgba(103, 232, 249, 0.6);
+  margin-bottom: 8px;
 }
 
-.diffOptions {
+#startBtn {
+  background: rgba(56, 189, 248, 0.14);
+  border: 2px solid #38bdf8;
+  color: #67e8f9;
+  padding: 22px 56px;
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.45);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background 0.15s, transform 0.12s;
+}
+#startBtn:hover, #startBtn:focus { outline: none; background: rgba(56, 189, 248, 0.22); }
+#startBtn:active { transform: scale(0.97); }
+
+#diffPicker {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: max(env(safe-area-inset-bottom), 24px);
   display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
+  gap: 10px;
   justify-content: center;
 }
 
 .diffBtn {
+  flex: 1 1 0;
+  max-width: 140px;
   background: #0f172a;
   border: 2px solid #334155;
-  color: #e2e8f0;
-  padding: 24px 28px;
+  color: #cbd5e1;
+  padding: 14px 8px;
   cursor: pointer;
   font-family: inherit;
-  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 3px;
   border-radius: 10px;
-  transition: border-color 0.15s, transform 0.15s, background 0.15s;
-  width: 200px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 0.15s, background 0.15s, color 0.15s, transform 0.12s;
 }
-.diffBtn:hover, .diffBtn:focus {
-  background: #1e293b;
-  outline: none;
-  transform: translateY(-3px);
-}
+.diffBtn:hover, .diffBtn:focus { outline: none; background: #1e293b; }
+.diffBtn:active { transform: scale(0.97); }
 
-.diffBtn .title {
-  font-size: 22px;
-  letter-spacing: 6px;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-.diffBtn .key {
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  font-size: 11px;
-  color: #64748b;
-  background: #1e293b;
-  border-radius: 4px;
-  padding: 2px 6px;
-  border: 1px solid #334155;
-}
-.diffBtn .row {
-  font-size: 12px;
-  color: #94a3b8;
-  letter-spacing: 1px;
-}
+.diffBtn[data-diff="easy"]   { color: #4ade80; }
+.diffBtn[data-diff="medium"] { color: #fbbf24; }
+.diffBtn[data-diff="hard"]   { color: #ef4444; }
 
-.diffBtn[data-diff="tresfacile"] .title { color: #2dd4bf; }
-.diffBtn[data-diff="easy"] .title       { color: #4ade80; }
-.diffBtn[data-diff="medium"] .title     { color: #fbbf24; }
-.diffBtn[data-diff="hard"] .title       { color: #ef4444; }
-
-.diffBtn[data-diff="tresfacile"]:hover { border-color: #2dd4bf; }
-.diffBtn[data-diff="easy"]:hover       { border-color: #4ade80; }
-.diffBtn[data-diff="medium"]:hover     { border-color: #fbbf24; }
-.diffBtn[data-diff="hard"]:hover       { border-color: #ef4444; }
-
-#trainingSection {
-  margin-top: 32px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 20px 28px;
-  border-top: 1px solid #1e293b;
-  max-width: 700px;
-}
-#trainingSection h3 {
-  font-size: 18px;
-  letter-spacing: 8px;
-  font-weight: 700;
-  color: #c084fc;
-  text-shadow: 0 0 16px rgba(192, 132, 252, 0.4);
-}
-#trainingSection p {
-  font-size: 12px;
-  color: #94a3b8;
-  letter-spacing: 1px;
-}
-
-.trainNumbers {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: 6px;
-}
-
-.trainBtn {
-  background: #0f172a;
-  border: 2px solid #334155;
-  color: #c084fc;
-  width: 48px;
-  height: 48px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 20px;
-  font-weight: 700;
-  border-radius: 8px;
-  transition: border-color 0.15s, transform 0.15s, background 0.15s;
-}
-.trainBtn:hover, .trainBtn:focus {
-  border-color: #c084fc;
-  background: #1e293b;
-  transform: translateY(-2px);
-  outline: none;
-}
-
-.trainBtn.selected {
-  background: #c084fc;
-  color: #0a0a14;
-  border-color: #c084fc;
-  box-shadow: 0 0 16px rgba(192, 132, 252, 0.55);
-}
+.diffBtn.selected[data-diff="easy"]   { border-color: #4ade80; background: rgba(74, 222, 128, 0.14); box-shadow: 0 0 14px rgba(74, 222, 128, 0.35); }
+.diffBtn.selected[data-diff="medium"] { border-color: #fbbf24; background: rgba(251, 191, 36, 0.14); box-shadow: 0 0 14px rgba(251, 191, 36, 0.35); }
+.diffBtn.selected[data-diff="hard"]   { border-color: #ef4444; background: rgba(239, 68, 68, 0.14); box-shadow: 0 0 14px rgba(239, 68, 68, 0.35); }
 
 #trainingBadge {
   color: #c084fc;
