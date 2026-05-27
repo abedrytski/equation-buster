@@ -457,6 +457,18 @@ body {
 #startBtn:hover, #startBtn:focus { outline: none; background: rgba(56, 189, 248, 0.22); }
 #startBtn:active { transform: scale(0.97); }
 
+#diffHint {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(max(env(safe-area-inset-bottom), 24px) + 60px);
+  margin: 0;
+  color: #94a3b8;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
 #diffPicker {
   position: absolute;
   left: 16px;
