@@ -35,6 +35,38 @@ html, body {
 #waveText { color: #67e8f9; letter-spacing: 1px; }
 #waveText b { color: #fff; }
 
+#scoreHud {
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+#scoreValue {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #f8fafc;
+  text-shadow: 0 0 10px rgba(248, 250, 252, 0.35), 0 2px 4px rgba(0, 0, 0, 0.7);
+  transition: color 0.2s, text-shadow 0.2s, transform 0.12s ease-out;
+}
+#scoreHud.tier2 #scoreValue { color: #fde68a; text-shadow: 0 0 12px rgba(251, 191, 36, 0.55), 0 2px 4px rgba(0, 0, 0, 0.7); }
+#scoreHud.tier3 #scoreValue { color: #fdba74; text-shadow: 0 0 14px rgba(251, 146, 60, 0.65), 0 2px 4px rgba(0, 0, 0, 0.7); }
+#scoreHud.tier4 #scoreValue {
+  color: #fca5a5;
+  text-shadow: 0 0 18px rgba(239, 68, 68, 0.8), 0 2px 4px rgba(0, 0, 0, 0.7);
+  animation: scoreGlow 0.8s ease-in-out infinite alternate;
+}
+#scoreHud.pop #scoreValue { transform: scale(1.18); }
+@keyframes scoreGlow {
+  from { text-shadow: 0 0 18px rgba(239, 68, 68, 0.8), 0 2px 4px rgba(0, 0, 0, 0.7); }
+  to   { text-shadow: 0 0 28px rgba(239, 68, 68, 1), 0 2px 4px rgba(0, 0, 0, 0.7); }
+}
+
 #xpText { color: #94a3b8; letter-spacing: 1px; }
 #xpText b { color: #fff; }
 #xpText .xpIcon { color: #38bdf8; }

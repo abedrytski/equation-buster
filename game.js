@@ -10,6 +10,8 @@
   const streakEl = document.getElementById("streak");
   const streakValueEl = document.getElementById("streakValue");
   const streakMultEl = document.getElementById("streakMult");
+  const scoreHudEl = document.getElementById("scoreHud");
+  const scoreValueEl = document.getElementById("scoreValue");
   const gameOverEl = document.getElementById("gameover");
   const finalScoreEl = document.getElementById("finalScore");
   const inputValueEl = document.getElementById("inputValue");
@@ -32,6 +34,8 @@
   const MAX_INPUT_LEN = 4;
   const MAX_CHIPS = 6;
   const CHIP_WRONG_LOCK = 0.35;
+  const WRONG_PUSH_PX = 22;
+  const WRONG_FLASH_DURATION = 0.4;
   const GRID_SIZE = 56;
   const LIFE_LOSS_WIPE_RADIUS = 320;
 
@@ -58,7 +62,15 @@
     }
     const budget = waveXpBudget(state.wave);
     if (budget <= 0) return 0;
-    return Math.min(1.0, state.waveXpEarned / budget);
+    // count XP still pending: not yet spent + currently on screen.
+    // bar fills as enemies are spawned & resolved (killed, expired, or escaped).
+    let aliveXp = 0;
+    for (const e of state.enemies) {
+      const s = TYPES[e.type];
+      if (s) aliveXp += s.xp;
+    }
+    const remaining = state.waveXpRemaining + aliveXp;
+    return Math.max(0, Math.min(1.0, 1 - remaining / budget));
   }
 
   // streak: [minCount, multiplier, cssTier]
@@ -239,7 +251,15 @@
     boss: {
       color: "#a78bfa", radius: 40, speed: 18, xp: 50, hp: 4, shape: "boss",
     },
+    mini: {
+      color: "#a78bfa", radius: 18, speed: 0, xp: 6, hp: 1, shape: "mini",
+      eq: (cap, target) => eqAdd(cap, target, 0.35, 2),
+    },
   };
+
+  const BOSS_ORBIT_RADIUS = 90;
+  const BOSS_ORBIT_SPEED = 0.9; // rad/sec
+  const NUM_MINIS = 3;
 
   const BOSS_COLORS = ["#a78bfa", "#f87171", "#fb923c", "#fbbf24", "#34d399", "#22d3ee"];
 
@@ -259,11 +279,12 @@
     return table[Math.max(0, i)];
   }
 
-  function pickType(level, cfg, maxXp) {
+  function pickType(level, cfg, maxXp, exclude) {
     const t = spawnTableForLevel(level, cfg);
     const usable = {};
     let total = 0;
     for (const k in t) {
+      if (exclude && exclude.has(k)) continue;
       if (maxXp == null || TYPES[k].xp <= maxXp) {
         usable[k] = t[k];
         total += t[k];
@@ -273,6 +294,7 @@
       // budget too small for anything in the table — fall back to the cheapest entry
       let cheapest = null;
       for (const k in t) {
+        if (exclude && exclude.has(k)) continue;
         if (cheapest === null || TYPES[k].xp < TYPES[cheapest].xp) cheapest = k;
       }
       return cheapest || "yellow";
@@ -283,6 +305,17 @@
       if (r <= 0) return k;
     }
     return "yellow";
+  }
+
+  function iceAllowedNow() {
+    // hard limits: one per wave, never two on screen at once
+    if (state.iceSpawnedThisWave >= 1) return false;
+    if (state.enemies.some((e) => e.type === "ice")) return false;
+    // soft gate: only useful when enough movers are around to be slowed
+    let movers = 0;
+    for (const e of state.enemies) if (e.speed > 0) movers++;
+    const need = Math.max(2, Math.ceil(maxEnemiesForLevel(state.level) * 0.6));
+    return movers >= need;
   }
 
   function spawnIntervalForLevel(level, cfg) {
@@ -356,6 +389,10 @@
     streak: 0,
     bestStreak: 0,
     freezeTimer: 0,
+    iceSpawnedThisWave: 0,
+    wrongFlashTimer: 0,
+    score: 0,
+    scorePopTimer: 0,
   };
 
   const FREEZE_DURATION = 3;
@@ -391,6 +428,10 @@
     state.streak = 0;
     state.bestStreak = 0;
     state.freezeTimer = 0;
+    state.iceSpawnedThisWave = 0;
+    state.wrongFlashTimer = 0;
+    state.score = 0;
+    state.scorePopTimer = 0;
     announceWave();
     if (isBossWave(state.wave)) {
       state.bossesSpawned += 1;
@@ -439,8 +480,10 @@
   }
 
   function spawnEnemy(maxXp) {
-    const type = pickType(state.level, state.config, maxXp);
+    const exclude = iceAllowedNow() ? null : new Set(["ice"]);
+    const type = pickType(state.level, state.config, maxXp, exclude);
     const spec = TYPES[type];
+    if (type === "ice") state.iceSpawnedThisWave++;
 
     let lane, x, y;
     if (spec.speed === 0) {
@@ -516,16 +559,59 @@
     const x = laneX(lane);
     const y = -m;
 
-    state.enemies.push({
+    const boss = {
       type: "boss",
       tier,
       x, y, lane,
       text: eq.text, answer: eq.answer,
       hp, maxHp: hp,
       radius, speed, color, xpReward,
-      phase: 1,
-    });
+      phase: 1,            // 1 = orbit (invulnerable), 2 = mirrored, 3 = enraged
+      invulnerable: true,
+    };
+    state.enemies.push(boss);
+
+    // spawn the 3 orbiting mini-bosses
+    const miniSpec = TYPES.mini;
+    for (let i = 0; i < NUM_MINIS; i++) {
+      const miniEq = miniSpec.eq(cap, targets);
+      state.enemies.push({
+        type: "mini",
+        parent: boss,
+        orbitAngle: (Math.PI * 2 * i) / NUM_MINIS,
+        orbitRadius: BOSS_ORBIT_RADIUS,
+        orbitSpeed: BOSS_ORBIT_SPEED,
+        x: boss.x + Math.cos((Math.PI * 2 * i) / NUM_MINIS) * BOSS_ORBIT_RADIUS,
+        y: boss.y + Math.sin((Math.PI * 2 * i) / NUM_MINIS) * BOSS_ORBIT_RADIUS,
+        text: miniEq.text, answer: miniEq.answer,
+        hp: 1, maxHp: 1,
+        radius: miniSpec.radius,
+        speed: 0,
+        color: color,
+        xpReward: miniSpec.xp,
+      });
+    }
+
     state.bossAlertTimer = 1.5;
+    rebuildChips();
+  }
+
+  function activateBoss(boss) {
+    boss.invulnerable = false;
+    boss.phase = 2;
+    // regenerate a fresh equation now that the boss is active
+    const cap = state.config.maxNum;
+    const targets = state.config.trainingTargets;
+    let eq;
+    if (state.config.simpleBoss) {
+      eq = eqAdd(cap, targets, 0.55 + boss.tier * 0.05, 3);
+    } else {
+      eq = eqAddOrSub(cap, targets, 0.55 + boss.tier * 0.06, 3);
+    }
+    boss.text = eq.text;
+    boss.answer = eq.answer;
+    state.flashTimer = 0.35;
+    state.shakeTimer = 0.3;
     rebuildChips();
   }
 
@@ -537,6 +623,12 @@
       state.xp -= xpToNext(state.level);
       state.level += 1;
     }
+  }
+
+  function gainScore(amount) {
+    // each enemy contributes (xp × 10) base points, multiplied by streak.
+    state.score += amount * 10 * streakMult();
+    state.scorePopTimer = 0.18;
   }
 
   function fireCharge() {
@@ -562,12 +654,24 @@
   function fireAnswer(answer) {
     const matches = [];
     for (let i = 0; i < state.enemies.length; i++) {
-      if (state.enemies[i].answer === answer) matches.push(i);
+      const en = state.enemies[i];
+      if (en.invulnerable) continue;
+      if (en.answer === answer) matches.push(i);
     }
 
     if (matches.length === 0) {
-      state.shakeTimer = 0.35;
+      state.shakeTimer = 0.45;
+      state.wrongFlashTimer = 0.4;
       state.streak = 0;
+      // wrong answer punishment: nudge every moving threat closer to the player
+      // and flash every enemy (including orbiting minis and stationary ice) so
+      // the player gets feedback regardless of which enemies are on screen.
+      for (const en of state.enemies) {
+        en.pushFlash = WRONG_FLASH_DURATION;
+        if (en.type === "mini") continue;     // orbit position is recomputed each frame
+        if (en.speed === 0) continue;          // ice doesn't approach
+        en.y += WRONG_PUSH_PX;
+      }
       return false;
     }
 
@@ -594,22 +698,35 @@
         });
         state.enemies.splice(idx, 1);
         gainXp(e.xpReward);
+        if (e.type !== "ice") gainScore(e.xpReward);
         state.waveXpEarned += e.xpReward;
         if (state.charge < state.config.chargeMax) state.charge += 1;
         if (e.type === "ice") state.freezeTimer = FREEZE_DURATION;
-      } else {
-        let eq;
-        if (e.type === "boss") {
-          if (state.config.simpleBoss) {
-            eq = eqAdd(state.config.maxNum, state.config.trainingTargets, 0.55 + e.tier * 0.05, 3);
-          } else if (e.phase === 2) {
-            eq = eqAdd3(state.config.maxNum, state.config.trainingTargets, 0.30 + e.tier * 0.04, 2);
-          } else {
-            eq = eqAddOrSub(state.config.maxNum, state.config.trainingTargets, 0.55 + e.tier * 0.06, 3);
+
+        // last mini-boss of a parent killed → activate the boss
+        if (e.type === "mini" && e.parent) {
+          const remaining = state.enemies.some(en => en.type === "mini" && en.parent === e.parent);
+          if (!remaining && state.enemies.includes(e.parent)) {
+            activateBoss(e.parent);
           }
-        } else {
-          eq = spec.eq(state.config.maxNum, state.config.trainingTargets);
         }
+      } else {
+        // regenerate equation; guarantee a different answer so the player
+        // cannot kill multi-HP enemies by spamming the same chip
+        const oldAnswer = e.answer;
+        const genEq = () => {
+          if (e.type === "boss") {
+            if (state.config.simpleBoss) {
+              return eqAdd(state.config.maxNum, state.config.trainingTargets, 0.55 + e.tier * 0.05, 3);
+            } else if (e.phase === 3) {
+              return eqAdd3(state.config.maxNum, state.config.trainingTargets, 0.30 + e.tier * 0.04, 2);
+            }
+            return eqAddOrSub(state.config.maxNum, state.config.trainingTargets, 0.55 + e.tier * 0.06, 3);
+          }
+          return spec.eq(state.config.maxNum, state.config.trainingTargets);
+        };
+        let eq = genEq();
+        for (let tries = 0; tries < 20 && eq.answer === oldAnswer; tries++) eq = genEq();
         e.text = eq.text;
         e.answer = eq.answer;
       }
@@ -633,10 +750,10 @@
       renderChips();
       return;
     }
-    // collect unique enemy answers, prioritizing nearest threats
-    const sorted = state.enemies.slice().sort((a, b) => {
-      return Math.hypot(a.x - playerX, a.y - playerY) - Math.hypot(b.x - playerX, b.y - playerY);
-    });
+    // collect unique enemy answers, prioritizing nearest threats; skip invulnerable
+    const sorted = state.enemies
+      .filter((e) => !e.invulnerable)
+      .sort((a, b) => Math.hypot(a.x - playerX, a.y - playerY) - Math.hypot(b.x - playerX, b.y - playerY));
     const wanted = [];
     const wantedSet = new Set();
     for (const e of sorted) {
@@ -660,11 +777,21 @@
         stillNeeded.delete(chips[i]);
       }
     }
-    // step 2: place stillNeeded into slots that don't currently hold a wanted value
+    // step 2: place stillNeeded values into RANDOM available slots
+    // (random slot picks prevent the same chip from being correct again on the
+    //  next hit of a multi-HP enemy)
     const toFill = Array.from(stillNeeded);
-    for (let i = 0; i < MAX_CHIPS && toFill.length > 0; i++) {
-      if (chips[i] != null && wantedSet.has(chips[i])) continue;
-      chips[i] = toFill.shift();
+    const avail = [];
+    for (let i = 0; i < MAX_CHIPS; i++) {
+      if (chips[i] == null || !wantedSet.has(chips[i])) avail.push(i);
+    }
+    for (let i = avail.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [avail[i], avail[j]] = [avail[j], avail[i]];
+    }
+    for (const ans of toFill) {
+      if (avail.length === 0) break;
+      chips[avail.shift()] = ans;
     }
     // step 3: fill any nulls with distractors (avoid duplicates)
     for (let i = 0; i < MAX_CHIPS; i++) {
@@ -734,6 +861,7 @@
     state.waveTimer = 0;
     state.waveXpRemaining = waveXpBudget(state.wave);
     state.waveXpEarned = 0;
+    state.iceSpawnedThisWave = 0;
     announceWave();
     if (isBossWave(state.wave)) {
       state.bossesSpawned += 1;
@@ -787,16 +915,27 @@
       const e = state.enemies[i];
       const spec = TYPES[e.type];
 
+      if (e.pushFlash) {
+        e.pushFlash = Math.max(0, e.pushFlash - dt);
+      }
+
       if (spec.lifetime) {
         if (!frozen) e.timeLeft -= dt;
         if (e.timeLeft <= 0) {
           state.enemies.splice(i, 1);
           continue;
         }
+      } else if (e.type === "mini") {
+        // mini-boss: orbit around its parent boss. No collision damage.
+        if (e.parent && state.enemies.includes(e.parent)) {
+          if (!frozen) e.orbitAngle += e.orbitSpeed * dt;
+          e.x = e.parent.x + Math.cos(e.orbitAngle) * e.orbitRadius;
+          e.y = e.parent.y + Math.sin(e.orbitAngle) * e.orbitRadius;
+        }
       } else if (!frozen) {
-        // boss enrage at half HP — gets faster, equation gets harder
-        if (e.type === "boss" && e.phase === 1 && e.hp <= e.maxHp / 2) {
-          e.phase = 2;
+        // boss enrage at half HP — gets faster, equation gets harder (mirrored phase 3)
+        if (e.type === "boss" && e.phase === 2 && e.hp <= e.maxHp / 2) {
+          e.phase = 3;
           e.speed = e.speed * 1.4;
           state.flashTimer = 0.35;
           state.shakeTimer = 0.25;
@@ -812,6 +951,14 @@
         // collision: enemy crosses the danger line
         if (e.y + e.radius * 0.4 >= playerY) {
           state.enemies.splice(i, 1);
+          // if a boss crosses the line, drag its remaining minis with it
+          if (e.type === "boss") {
+            for (let j = state.enemies.length - 1; j >= 0; j--) {
+              if (state.enemies[j].type === "mini" && state.enemies[j].parent === e) {
+                state.enemies.splice(j, 1);
+              }
+            }
+          }
           state.lives -= 1;
           state.streak = 0;
           state.flashTimer = 0.4;
@@ -835,7 +982,7 @@
 
           if (state.lives <= 0) {
             state.gameOver = true;
-            finalScoreEl.textContent = `Wave reached: ${state.wave} · Best streak: ${state.bestStreak}`;
+            finalScoreEl.textContent = `Score: ${state.score.toLocaleString("en-US")} · Wave: ${state.wave} · Best streak: ${state.bestStreak}`;
           }
           rebuildChips();
           break;
@@ -845,6 +992,8 @@
 
     if (state.flashTimer > 0) state.flashTimer -= dt;
     if (state.shakeTimer > 0) state.shakeTimer -= dt;
+    if (state.wrongFlashTimer > 0) state.wrongFlashTimer -= dt;
+    if (state.scorePopTimer > 0) state.scorePopTimer -= dt;
     if (state.levelUpTimer > 0) state.levelUpTimer -= dt;
     if (state.bossAlertTimer > 0) state.bossAlertTimer -= dt;
     if (state.chipLockTimer > 0) state.chipLockTimer -= dt;
@@ -901,7 +1050,7 @@
     ctx.closePath();
   }
 
-  function drawEqLabel(cx, baselineY, text, color) {
+  function drawEqLabel(cx, baselineY, text, color, mirror = false) {
     ctx.font = "bold 14px ui-monospace, Menlo, monospace";
     const padX = 8, bh = 22;
     const tw = ctx.measureText(text).width;
@@ -919,12 +1068,30 @@
     ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(text, cx, by + bh / 2 + 1);
+    if (mirror) {
+      ctx.save();
+      ctx.translate(cx, by + bh / 2 + 1);
+      ctx.scale(-1, 1);
+      ctx.fillText(text, 0, 0);
+      ctx.restore();
+    } else {
+      ctx.fillText(text, cx, by + bh / 2 + 1);
+    }
   }
 
   function drawEnemy(e) {
     const spec = TYPES[e.type];
     const color = e.color;
+
+    // wrong-answer punishment flash: red shock ring that fades out
+    if (e.pushFlash && e.pushFlash > 0) {
+      const k = e.pushFlash / WRONG_FLASH_DURATION;
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, e.radius * (1.5 + (1 - k) * 0.6), 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(239, 68, 68, ${0.75 * k})`;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
 
     // shield aura (blue, hp > 1)
     if (spec.hasShield && e.hp > 1) {
@@ -936,14 +1103,36 @@
       ctx.stroke();
     }
 
-    // boss aura (rotating outer rings — extra red ring in phase 2)
+    // mini-boss tether to its parent boss
+    if (e.type === "mini" && e.parent) {
+      ctx.save();
+      ctx.strokeStyle = e.color + "44";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(e.parent.x, e.parent.y);
+      ctx.lineTo(e.x, e.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // boss aura (rotating outer rings — extra red ring while enraged, shield while invulnerable)
     if (spec.shape === "boss") {
       const t = performance.now() / 1000;
       octPath(e.x, e.y, e.radius * 1.35, t);
       ctx.strokeStyle = color + "55";
       ctx.lineWidth = 2;
       ctx.stroke();
-      if (e.phase === 2) {
+      if (e.invulnerable) {
+        const pulse = 0.5 + 0.4 * Math.sin(performance.now() / 280);
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.radius * 1.7, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(148, 163, 184, ${pulse})`;
+        ctx.setLineDash([6, 6]);
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (e.phase === 3) {
         const pulse = 0.5 + 0.4 * Math.sin(performance.now() / 180);
         octPath(e.x, e.y, e.radius * 1.6, -t * 1.4);
         ctx.strokeStyle = `rgba(239, 68, 68, ${pulse})`;
@@ -1002,13 +1191,16 @@
       }
     }
 
-    // boss: HP bar + tier label (with rage marker in phase 2)
+    // boss: HP bar + tier label (with rage marker in phase 3)
     if (spec.shape === "boss") {
-      ctx.fillStyle = e.phase === 2 ? "#fecaca" : "rgba(255, 255, 255, 0.85)";
+      ctx.fillStyle = e.phase === 3 ? "#fecaca" : "rgba(255, 255, 255, 0.85)";
       ctx.font = "bold 12px ui-monospace, Menlo, monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(`BOSS T${e.tier}${e.phase === 2 ? " !" : ""}`, e.x, e.y - 6);
+      const label = e.invulnerable
+        ? `THE MIRROR T${e.tier} ✦`
+        : `THE MIRROR BOSS T${e.tier}${e.phase === 3 ? " !" : ""}`;
+      ctx.fillText(label, e.x, e.y - 6);
 
       const barW = e.radius * 1.5;
       const barH = 6;
@@ -1016,12 +1208,18 @@
       const barY = e.y + e.radius * 0.45;
       ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
       ctx.fillRect(barX, barY, barW, barH);
-      ctx.fillStyle = e.phase === 2 ? "#ef4444" : color;
+      ctx.fillStyle = e.phase === 3 ? "#ef4444" : color;
       ctx.fillRect(barX, barY, barW * (e.hp / e.maxHp), barH);
     }
 
-    // equation label
-    drawEqLabel(e.x, e.y - e.radius - 8, e.text, color);
+    // equation label: hidden for invulnerable boss; mirrored when boss is active
+    if (e.type === "boss") {
+      if (!e.invulnerable) {
+        drawEqLabel(e.x, e.y - e.radius - 8, e.text, color, true);
+      }
+    } else {
+      drawEqLabel(e.x, e.y - e.radius - 8, e.text, color);
+    }
   }
 
   function drawLanesAndDangerLine() {
@@ -1116,6 +1314,23 @@
 
     ctx.restore();
 
+    // wrong-answer red vignette: pulses across the whole screen so feedback is
+    // visible even when no enemies are on screen
+    if (state.wrongFlashTimer > 0) {
+      const k = Math.min(1, state.wrongFlashTimer / WRONG_FLASH_DURATION);
+      ctx.save();
+      ctx.fillStyle = `rgba(239, 68, 68, ${0.28 * k})`;
+      ctx.fillRect(0, 0, W, H);
+      // brighter border ring for emphasis
+      const bw = 14;
+      ctx.fillStyle = `rgba(239, 68, 68, ${0.55 * k})`;
+      ctx.fillRect(0, 0, W, bw);
+      ctx.fillRect(0, H - bw, W, bw);
+      ctx.fillRect(0, 0, bw, H);
+      ctx.fillRect(W - bw, 0, bw, H);
+      ctx.restore();
+    }
+
     // freeze overlay
     if (state.freezeTimer > 0) {
       const fade = Math.min(1, state.freezeTimer / 0.4);
@@ -1184,6 +1399,13 @@
     } else {
       streakEl.hidden = true;
     }
+
+    // score readout (tier color + pop on increment; multiplier badge lives on the streak chip)
+    scoreValueEl.textContent = state.score.toLocaleString("en-US");
+    scoreHudEl.className = "";
+    const sTier = streakTierClass();
+    if (sTier) scoreHudEl.classList.add(sTier);
+    if (state.scorePopTimer > 0) scoreHudEl.classList.add("pop");
 
     if (state.config) {
       if (state.charge >= state.config.chargeMax) {
