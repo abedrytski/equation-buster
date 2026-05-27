@@ -48,6 +48,7 @@
 
   const BREATHER_DURATION = 4;    // seconds between waves
   const BOSS_EVERY_N_WAVES = 3;
+  const MAX_WAVES = 6;
 
   function isBossWave(wave) { return wave % BOSS_EVERY_N_WAVES === 0; }
   function waveXpBudget(wave) {
@@ -997,8 +998,14 @@
     // wave phase machine (breather is allowed to tick during freeze so the freeze
     // doesn't stretch the inter-wave gap; new active-phase spawns are gated below)
     if (state.wavePhase === "active" && waveCleared) {
-      state.wavePhase = "breather";
-      state.waveTimer = BREATHER_DURATION;
+      if (state.wave >= MAX_WAVES) {
+        // run complete — show the score screen instead of advancing
+        state.gameOver = true;
+        finalScoreEl.textContent = `Score: ${state.score.toLocaleString("en-US")} · Wave: ${state.wave} · Best streak: ${state.bestStreak}`;
+      } else {
+        state.wavePhase = "breather";
+        state.waveTimer = BREATHER_DURATION;
+      }
     } else if (state.wavePhase === "breather") {
       state.waveTimer -= dt;
       if (state.waveTimer <= 0) advanceWave();
@@ -1529,7 +1536,7 @@
 
     // HUD
     livesEl.textContent = "♥".repeat(state.lives) + "♡".repeat(MAX_LIVES - state.lives);
-    waveTextEl.innerHTML = `Wave <b>${state.wave}</b>`;
+    waveTextEl.innerHTML = `Wave <b>${state.wave}</b>/${MAX_WAVES}`;
     const cp = cycleProgress();
     xpFillEl.style.clipPath = `inset(0 ${((1 - cp) * 100).toFixed(2)}% 0 0)`;
     tick1El.classList.toggle("passed", cp >= 1 / 3);
@@ -1539,8 +1546,9 @@
     bossAlertEl.hidden = state.bossAlertTimer <= 0;
     pausedEl.hidden = !state.paused;
 
-    // wave announce flashes the new wave number when levelUpTimer is active
-    if (state.levelUpTimer > 0) {
+    // wave announce flashes the new wave number when levelUpTimer is active.
+    // Suppress it on boss waves so it doesn't overlap the BOSS alert.
+    if (state.levelUpTimer > 0 && !isBossWave(state.wave)) {
       waveAnnounceEl.textContent = `WAVE ${state.wave}`;
       waveAnnounceEl.hidden = false;
     } else {
@@ -1660,6 +1668,6 @@
     startGame(selectedDiff, { startWave: BOSS_EVERY_N_WAVES });
   });
 
-  restartBtnEl.addEventListener("click", () => startGame(state.diffKey));
+  restartBtnEl.addEventListener("click", () => location.reload());
   changeDiffBtnEl.addEventListener("click", goToStart);
 })();
