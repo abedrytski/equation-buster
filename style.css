@@ -38,7 +38,7 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: 50px;
+  height: 78px;
   background: #0a0a14;
   pointer-events: none;
 }
@@ -68,8 +68,9 @@ body {
   top: -2px;
   transform: translateX(-50%);
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
@@ -100,7 +101,7 @@ body {
 
 #xpBar {
   position: absolute;
-  top: 48px;
+  top: 72px;
   left: 16px;
   right: 16px;
   height: 6px;
@@ -165,7 +166,7 @@ body {
 
 #waveAnnounce {
   position: absolute;
-  top: 80px;
+  top: 100px;
   left: 50%;
   transform: translateX(-50%);
   color: #38bdf8;
@@ -208,50 +209,48 @@ body {
   text-shadow: 0 0 24px rgba(56, 189, 248, 0.8);
 }
 
+/* Streak chip sits directly under the score (inside #scoreHud). Compact size
+   so the whole HUD stack fits within the topMask strip and never floats over
+   enemies. */
 #streak {
-  position: absolute;
-  top: 64px;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
+  gap: 4px;
+  padding: 1px 8px;
   background: rgba(15, 23, 42, 0.85);
   border: 1px solid #334155;
-  border-radius: 16px;
-  font-size: 14px;
-  letter-spacing: 2px;
+  border-radius: 10px;
+  font-size: 11px;
+  letter-spacing: 1px;
   pointer-events: none;
-  z-index: 3;
 }
 #streak[hidden] { display: none; }
-#streak #streakLabel { color: #94a3b8; font-size: 11px; letter-spacing: 3px; }
-#streak b { color: #fff; font-size: 18px; }
+#streak #streakLabel { color: #94a3b8; font-size: 9px; letter-spacing: 2px; }
+#streak b { color: #fff; font-size: 13px; line-height: 1; }
 #streak #streakMult {
   color: #fbbf24;
   font-weight: 700;
-  margin-left: 4px;
+  margin-left: 3px;
   text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
 }
-#streak.tier2 { border-color: #fbbf24; box-shadow: 0 0 16px rgba(251, 191, 36, 0.35); }
+#streak.tier2 { border-color: #fbbf24; box-shadow: 0 0 14px rgba(251, 191, 36, 0.35); }
 #streak.tier2 #streakMult { color: #fbbf24; }
-#streak.tier3 { border-color: #fb923c; box-shadow: 0 0 18px rgba(251, 146, 60, 0.45); }
+#streak.tier3 { border-color: #fb923c; box-shadow: 0 0 16px rgba(251, 146, 60, 0.45); }
 #streak.tier3 #streakMult { color: #fb923c; text-shadow: 0 0 12px rgba(251, 146, 60, 0.7); }
 #streak.tier4 {
   border-color: #ef4444;
-  box-shadow: 0 0 22px rgba(239, 68, 68, 0.55);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.55);
   animation: streakPulse 0.6s ease-in-out infinite alternate;
 }
 #streak.tier4 #streakMult { color: #ef4444; text-shadow: 0 0 14px rgba(239, 68, 68, 0.8); }
 @keyframes streakPulse {
-  from { transform: translateX(-50%) scale(1); }
-  to   { transform: translateX(-50%) scale(1.05); }
+  from { transform: scale(1); }
+  to   { transform: scale(1.06); }
 }
 
 #bossAlert {
   position: absolute;
-  top: 110px;
+  top: 130px;
   left: 50%;
   transform: translateX(-50%);
   color: #ef4444;
@@ -278,20 +277,20 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-auto-rows: 1fr;
-  gap: 8px;
-  padding: 10px 12px max(env(safe-area-inset-bottom), 12px);
+  gap: 6px;
+  padding: 4px 12px max(env(safe-area-inset-bottom), 8px);
   background: linear-gradient(to bottom, transparent, rgba(10, 10, 20, 0.85) 30%);
   z-index: 5;
 }
 #chipBar[hidden] { display: none; }
 
 .chip {
-  font: 700 28px/1 ui-monospace, Menlo, monospace;
+  font: 700 26px/1 ui-monospace, Menlo, monospace;
   color: #f8fafc;
   background: #1e293b;
   border: 2px solid #334155;
   border-radius: 12px;
-  padding: 16px 0;
+  padding: 12px 0;
   text-align: center;
   cursor: pointer;
   transition: transform 80ms ease, background 120ms ease, border-color 120ms ease;

@@ -31,7 +31,6 @@
   const bossBgmEl = document.getElementById("bossBgm");
   const muteBtnEl = document.getElementById("muteBtn");
 
-  const PLAYER_RADIUS = 14;
   const MAX_LIVES = 3;
   const MAX_INPUT_LEN = 4;
   const MAX_CHIPS = 6;
@@ -345,6 +344,17 @@
 
   let W = 0, H = 0, dpr = 1;
   let playerX = 0, playerY = 0;
+  // Park the player line a hair above the chip bar. We derive playerY from the
+  // chip bar's measured offsetHeight (which already factors in safe-area-inset)
+  // so the finish line hugs the buttons regardless of device chrome. When the
+  // chip bar is hidden (pre-game), fall back to a reasonable default.
+  const PLAYER_LINE_GAP = 70;
+  function placePlayerLine() {
+    playerX = W / 2;
+    let chipBarH = chipBarEl.offsetHeight;
+    if (chipBarH === 0) chipBarH = H < 520 ? 110 : 170;
+    playerY = H - chipBarH - PLAYER_LINE_GAP;
+  }
   function resize() {
     dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
@@ -353,11 +363,7 @@
     canvas.width = Math.floor(W * dpr);
     canvas.height = Math.floor(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    playerX = W / 2;
-    // place the player just above the chip bar at the bottom
-    const offsetFromBottom = H < 520 ? 120 : 230;
-    playerY = H - offsetFromBottom;
+    placePlayerLine();
   }
   window.addEventListener("resize", resize);
   if (window.visualViewport) {
@@ -640,7 +646,7 @@
 
     const hp = simple
       ? 2 + tier + randInt(0, 1)
-      : 2 + tier * 2 + randInt(0, 1);
+      : 1 + tier * 2 + randInt(0, 1);
     const speed = 14 + tier * 3;
     const radius = 50 + tier * 10;
     const color = BOSS_COLORS[Math.floor(Math.random() * BOSS_COLORS.length)];
@@ -917,9 +923,12 @@
     }
   }
 
+  let chipBarWasVisible = false;
   function renderChips() {
     const visible = state.started && !state.gameOver && state.chips.length > 0;
     chipBarEl.hidden = !visible;
+    if (visible && !chipBarWasVisible) placePlayerLine();
+    chipBarWasVisible = visible;
     if (!visible) return;
     const children = chipBarEl.children;
     for (let i = 0; i < MAX_CHIPS; i++) {
@@ -1345,16 +1354,46 @@
     }
     ctx.restore();
 
-    // danger line at the player's y
+    // danger line at the player's y — if an enemy crosses this, the player
+    // loses a life. Layered: red warning gradient band above, then a bold
+    // pulsing dashed hazard line. Hard to miss.
     const lineY = playerY;
     ctx.save();
-    const pulse = 0.45 + 0.25 * Math.sin(performance.now() / 380);
-    ctx.strokeStyle = `rgba(239, 68, 68, ${pulse * 0.55})`;
-    ctx.lineWidth = 1.5;
+    const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 380);
+
+    // warning gradient band fading up from the line
+    const bandH = 36;
+    const grad = ctx.createLinearGradient(0, lineY - bandH, 0, lineY);
+    grad.addColorStop(0, "rgba(239, 68, 68, 0)");
+    grad.addColorStop(1, `rgba(239, 68, 68, ${0.18 + 0.10 * pulse})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, lineY - bandH, W, bandH);
+
+    // main dashed hazard line
+    ctx.shadowColor = "rgba(239, 68, 68, 1)";
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = `rgba(255, 80, 80, ${0.85 + 0.15 * pulse})`;
+    ctx.lineWidth = 4;
+    ctx.setLineDash([14, 8]);
+    ctx.lineDashOffset = -(performance.now() / 60) % 22;
     ctx.beginPath();
     ctx.moveTo(0, lineY);
     ctx.lineTo(W, lineY);
     ctx.stroke();
+    ctx.setLineDash([]);
+
+    // bright inner highlight to make the line read crisp even with the glow
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = `rgba(255, 220, 220, ${0.6 + 0.2 * pulse})`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([14, 8]);
+    ctx.lineDashOffset = -(performance.now() / 60) % 22;
+    ctx.beginPath();
+    ctx.moveTo(0, lineY);
+    ctx.lineTo(W, lineY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
     ctx.restore();
   }
 
@@ -1373,19 +1412,6 @@
     }
     ctx.save();
     ctx.translate(shakeX, shakeY);
-
-    // player
-    ctx.shadowColor = "#38bdf8";
-    ctx.shadowBlur = 20;
-    ctx.fillStyle = "#7dd3fc";
-    ctx.beginPath();
-    ctx.arc(playerX, playerY, PLAYER_RADIUS, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = "#bae6fd";
-    ctx.beginPath();
-    ctx.arc(playerX - 3, playerY - 3, PLAYER_RADIUS * 0.4, 0, Math.PI * 2);
-    ctx.fill();
 
     // lasers behind enemies
     for (const l of state.lasers) {
