@@ -20,7 +20,7 @@ body {
    phone in portrait it fills the screen. */
 #stage {
   position: relative;
-  width: min(100vw, calc(100dvh * 9 / 19.5));
+  width: min(100vw, calc(100dvh * 9 / 19.5 + 150px));
   height: min(100dvh, calc(100vw * 19.5 / 9));
   background: #0a0a14;
   overflow: hidden;
