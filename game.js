@@ -547,8 +547,13 @@
     return Math.min(cap, wave + add);
   }
 
-  const SPAWN_HEAD_CLEARANCE = 90;
+  // Moving enemies appear just below the wave bar (topMask is 78px tall, and
+  // each enemy carries a ~30px equation label above its center, so center y
+  // must be ≥ 108 + radius for the label to clear the mask).
+  const TOP_SPAWN_Y = 110;
+  const SPAWN_HEAD_CLEARANCE = 180;
   const LANE_SEPARATION_GAP = 8;
+  const SPAWN_FADE_DURATION = 0.45;  // seconds for newly spawned enemies to fade in
 
   function pickSpawnLane() {
     // rank lanes by busy-ness (count asc), tie-break by topmost-enemy y desc
@@ -583,17 +588,20 @@
 
     let lane, x, y;
     if (spec.speed === 0) {
-      // stationary ice: pick a lane, place in the upper half
+      // stationary ice: pick a lane, place in the upper half (below the wave
+      // bar with label clearance)
       lane = Math.floor(Math.random() * NUM_LANES);
       x = laneX(lane);
-      const topZoneBottom = Math.max(140, playerY * 0.55);
-      y = 80 + Math.random() * Math.max(40, topZoneBottom - 80);
+      const iceTop = TOP_SPAWN_Y + spec.radius;
+      const topZoneBottom = Math.max(iceTop + 40, playerY * 0.55);
+      y = iceTop + Math.random() * (topZoneBottom - iceTop);
     } else {
-      // moving enemies drop in from above; defer if no lane has clearance
+      // moving enemies appear right below the wave bar, fully visible with
+      // their equation label. Defer if no lane has clearance.
       lane = pickSpawnLane();
       if (lane < 0) return 0;
       x = laneX(lane);
-      y = -(spec.radius + 40);
+      y = TOP_SPAWN_Y + spec.radius;
     }
 
     if (type === "ice") state.iceSpawnedThisWave++;
@@ -608,6 +616,7 @@
       speed: spec.speed,
       color: spec.color,
       xpReward: spec.xp,
+      spawnFade: 0,
     };
     if (spec.lifetime) enemy.timeLeft = spec.lifetime;
     state.enemies.push(enemy);
@@ -652,11 +661,12 @@
     const color = BOSS_COLORS[Math.floor(Math.random() * BOSS_COLORS.length)];
     const xpReward = 50 * tier;
 
-    // boss drops in from above in the center lane
+    // boss appears centered in the playfield, below the wave bar. Y must be
+    // deep enough that the orbiting mini-bosses (orbit radius 90) stay below
+    // the topMask at their highest orbit point.
     const lane = 1;
-    const m = radius + 60;
     const x = laneX(lane);
-    const y = -m;
+    const y = TOP_SPAWN_Y + BOSS_ORBIT_RADIUS + 30;
 
     const boss = {
       type: "boss",
@@ -667,6 +677,7 @@
       radius, speed, color, xpReward,
       phase: 1,            // 1 = orbit (invulnerable), 2 = mirrored, 3 = enraged
       invulnerable: true,
+      spawnFade: 0,
     };
     state.enemies.push(boss);
 
@@ -688,6 +699,7 @@
         speed: 0,
         color: color,
         xpReward: miniSpec.xp,
+        spawnFade: 0,
       });
     }
 
@@ -709,8 +721,6 @@
     }
     boss.text = eq.text;
     boss.answer = eq.answer;
-    state.flashTimer = 0.35;
-    state.shakeTimer = 0.3;
     rebuildChips();
   }
 
@@ -1021,6 +1031,10 @@
         e.pushFlash = Math.max(0, e.pushFlash - dt);
       }
 
+      if (e.spawnFade != null && e.spawnFade < 1) {
+        e.spawnFade = Math.min(1, e.spawnFade + dt / SPAWN_FADE_DURATION);
+      }
+
       if (spec.lifetime) {
         if (!frozen) e.timeLeft -= dt;
         if (e.timeLeft <= 0) {
@@ -1041,8 +1055,6 @@
         if (e.type === "boss" && e.phase === 2 && e.hp <= e.maxHp * 2 / 3) {
           e.phase = 3;
           e.speed = e.speed * 1.4;
-          state.flashTimer = 0.35;
-          state.shakeTimer = 0.25;
         }
 
         // straight-down lane movement
@@ -1202,6 +1214,18 @@
     const spec = TYPES[e.type];
     const color = e.color;
 
+    // newly spawned enemies fade in (and scale up slightly) so they don't
+    // pop into existence when they appear right under the wave bar
+    const fade = e.spawnFade != null ? e.spawnFade : 1;
+    ctx.save();
+    if (fade < 1) {
+      ctx.globalAlpha = fade;
+      const k = 0.8 + 0.2 * fade;
+      ctx.translate(e.x, e.y);
+      ctx.scale(k, k);
+      ctx.translate(-e.x, -e.y);
+    }
+
     // wrong-answer punishment flash: red shock ring that fades out
     if (e.pushFlash && e.pushFlash > 0) {
       const k = e.pushFlash / WRONG_FLASH_DURATION;
@@ -1339,6 +1363,8 @@
     } else {
       drawEqLabel(e.x, e.y - e.radius - 8, e.text, color);
     }
+
+    ctx.restore();
   }
 
   function drawLanesAndDangerLine() {
@@ -1615,7 +1641,7 @@
 
   // selected difficulty on the start screen — clicking a diff button just
   // selects it; the START button launches the game with whatever is selected
-  let selectedDiff = "medium";
+  let selectedDiff = "easy";
   diffBtnEls.forEach((btn) => {
     btn.addEventListener("click", () => {
       selectedDiff = btn.dataset.diff;
