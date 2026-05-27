@@ -274,11 +274,11 @@
 
   // weighted spawn table per wave (last entry used for higher waves)
   const SPAWN_TABLE = [
-    { yellow: 1 },                                                    // W1
-    { yellow: 3, ice: 1, pink: 2 },                                 // W3
-    { yellow: 2, ice: 1, pink: 2, green: 2 },                       // W4
-    { yellow: 2, ice: 1, pink: 2, green: 2, blue: 2 },              // W5
-    { yellow: 2, ice: 1, pink: 2, green: 2, blue: 2, hexagon: 1 },  // W6+
+    { yellow: 3, ice: 1 },                                          // W1
+    { yellow: 3, ice: 1, pink: 2 },                                 // W2
+    { yellow: 2, ice: 1, pink: 2, green: 2 },                       // W3
+    { yellow: 2, ice: 1, pink: 2, green: 2, blue: 2 },              // W4
+    { yellow: 2, ice: 1, pink: 2, green: 2, blue: 2, hexagon: 1 },  // W5+
   ];
 
   function spawnTableForWave(wave, cfg) {
@@ -412,7 +412,7 @@
     musicMuted: false,
   };
 
-  const FREEZE_DURATION = 3;
+  const FREEZE_DURATION = 5;
 
   function startGame(diffKey, opts = {}) {
     const { startWave, ...configOpts } = opts;
@@ -551,6 +551,9 @@
   // each enemy carries a ~30px equation label above its center, so center y
   // must be ≥ 108 + radius for the label to clear the mask).
   const TOP_SPAWN_Y = 110;
+  // Boss spawn center y. Must be ≥ TOP_SPAWN_Y + BOSS_ORBIT_RADIUS so the
+  // orbiting minis at their highest point stay below the wave bar/topMask.
+  const BOSS_SPAWN_Y = TOP_SPAWN_Y + BOSS_ORBIT_RADIUS - 8;
   const SPAWN_HEAD_CLEARANCE = 180;
   const LANE_SEPARATION_GAP = 8;
   const SPAWN_FADE_DURATION = 0.45;  // seconds for newly spawned enemies to fade in
@@ -666,7 +669,7 @@
     // the topMask at their highest orbit point.
     const lane = 1;
     const x = laneX(lane);
-    const y = TOP_SPAWN_Y + BOSS_ORBIT_RADIUS + 30;
+    const y = BOSS_SPAWN_Y;
 
     const boss = {
       type: "boss",
