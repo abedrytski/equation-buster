@@ -23,6 +23,7 @@
   const changeDiffBtnEl = document.getElementById("changeDiffBtn");
   const diffBtnEls = document.querySelectorAll(".diffBtn");
   const startBtnEl = document.getElementById("startBtn");
+  const bossDebugBtnEl = document.getElementById("bossDebugBtn");
   const bossAlertEl = document.getElementById("bossAlert");
   const inputBoxEl = document.getElementById("inputBox");
   const chipBarEl = document.getElementById("chipBar");
@@ -408,8 +409,9 @@
   const FREEZE_DURATION = 3;
 
   function startGame(diffKey, opts = {}) {
+    const { startWave, ...configOpts } = opts;
     state.diffKey = diffKey;
-    state.config = { ...DIFFICULTIES[diffKey], ...opts };
+    state.config = { ...DIFFICULTIES[diffKey], ...configOpts };
     state.started = true;
     state.lives = MAX_LIVES;
     state.level = 1;
@@ -430,10 +432,10 @@
     state.bossAlertTimer = 0;
     state.chips = [];
     state.chipLockTimer = 0;
-    state.wave = 1;
+    state.wave = startWave || 1;
     state.wavePhase = "active";
     state.waveTimer = 0;
-    state.waveXpRemaining = waveXpBudget(1);
+    state.waveXpRemaining = waveXpBudget(state.wave);
     state.waveXpEarned = 0;
     state.streak = 0;
     state.bestStreak = 0;
@@ -637,8 +639,8 @@
     }
 
     const hp = simple
-      ? 4 + tier * 2 + randInt(0, 1)
-      : 5 + tier * 3 + randInt(0, 2);
+      ? 2 + tier + randInt(0, 1)
+      : 3 + tier * 2 + randInt(0, 1);
     const speed = 14 + tier * 3;
     const radius = 50 + tier * 10;
     const color = BOSS_COLORS[Math.floor(Math.random() * BOSS_COLORS.length)];
@@ -1596,6 +1598,12 @@
   });
 
   startBtnEl.addEventListener("click", () => startGame(selectedDiff));
+
+  // DEBUG — jump straight to the T1 boss fight. Remove this and the
+  // #bossDebugBtn markup/CSS when the boss tuning pass is done.
+  bossDebugBtnEl.addEventListener("click", () => {
+    startGame(selectedDiff, { startWave: BOSS_EVERY_N_WAVES });
+  });
 
   restartBtnEl.addEventListener("click", () => startGame(state.diffKey));
   changeDiffBtnEl.addEventListener("click", goToStart);

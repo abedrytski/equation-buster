@@ -492,6 +492,27 @@ body {
 .diffBtn.selected[data-diff="medium"] { border-color: #fbbf24; background: rgba(251, 191, 36, 0.14); box-shadow: 0 0 14px rgba(251, 191, 36, 0.35); }
 .diffBtn.selected[data-diff="hard"]   { border-color: #ef4444; background: rgba(239, 68, 68, 0.14); box-shadow: 0 0 14px rgba(239, 68, 68, 0.35); }
 
+/* debug button — skip to T1 boss fight. Visually distinct (smaller, dashed) so
+   it's obviously a dev-only shortcut and easy to spot for removal later. */
+#bossDebugBtn {
+  flex: 0 0 auto;
+  background: rgba(167, 139, 250, 0.10);
+  border: 1px dashed #a78bfa;
+  color: #c4b5fd;
+  padding: 10px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  border-radius: 8px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background 0.15s, transform 0.12s;
+}
+#bossDebugBtn:hover, #bossDebugBtn:focus { outline: none; background: rgba(167, 139, 250, 0.20); }
+#bossDebugBtn:active { transform: scale(0.97); }
+
 #trainingBadge {
   color: #c084fc;
   letter-spacing: 1px;
