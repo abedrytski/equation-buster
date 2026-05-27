@@ -16,6 +16,7 @@
   const scoreValueEl = document.getElementById("scoreValue");
   const gameOverEl = document.getElementById("gameover");
   const finalScoreEl = document.getElementById("finalScore");
+  const gameOverTitleEl = document.getElementById("gameoverTitle");
   const inputValueEl = document.getElementById("inputValue");
   const pausedEl = document.getElementById("paused");
   const startScreenEl = document.getElementById("startScreen");
@@ -24,6 +25,7 @@
   const diffBtnEls = document.querySelectorAll(".diffBtn");
   const startBtnEl = document.getElementById("startBtn");
   const bossDebugBtnEl = document.getElementById("bossDebugBtn");
+  const boss2DebugBtnEl = document.getElementById("boss2DebugBtn");
   const bossAlertEl = document.getElementById("bossAlert");
   const inputBoxEl = document.getElementById("inputBox");
   const chipBarEl = document.getElementById("chipBar");
@@ -171,6 +173,11 @@
     const a = randInt(1, eachMax), b = randInt(1, eachMax), c = randInt(1, eachMax);
     return { text: `${a}+${b}+${c}`, answer: a + b + c };
   }
+  function mkAdd5(eachMax) {
+    const nums = [];
+    for (let i = 0; i < 4; i++) nums.push(randInt(1, eachMax));
+    return { text: nums.join("+"), answer: nums.reduce((a, b) => a + b, 0) };
+  }
 
   // training-mode variants: equation must contain a chosen target as one operand
   function pickTarget(targets) {
@@ -214,6 +221,11 @@
     const m = operandCap(cap, frac, min);
     if (targets && targets.length) return mkAdd3With(pickTarget(targets), m);
     return mkAdd3(m);
+  }
+  function eqAdd5(cap) {
+    // matches yellow's per-operand cap (frac 0.25, min 2)
+    const m = operandCap(cap, 0.25, 2);
+    return mkAdd5(m);
   }
 
   // ---------- enemy types
@@ -265,11 +277,18 @@
       color: "#a78bfa", radius: 18, speed: 0, xp: 6, hp: 1, shape: "mini",
       eq: (cap, target) => eqAdd(cap, target, 0.35, 2),
     },
+    summon: {
+      // SUMMONER's minions — stationary, lifetime-bounded, 5-num add equations
+      color: "#c084fc", radius: 14, speed: 0, xp: 5, hp: 1, lifetime: 8,
+      eq: (cap) => eqAdd5(cap),
+    },
   };
 
   const BOSS_ORBIT_RADIUS = 90;
   const BOSS_ORBIT_SPEED = 0.9; // rad/sec
   const NUM_MINIS = 3;
+  const SUMMONER_MINIONS = 3;
+  const SUMMONER_SPAWN_DELAY = 0.8;
 
   const BOSS_COLORS = ["#a78bfa", "#f87171", "#fb923c", "#fbbf24", "#34d399", "#22d3ee"];
 
@@ -435,11 +454,13 @@
     state.input = "";
     state.paused = false;
     state.charge = 0;
-    state.bossesSpawned = 0;
     state.bossAlertTimer = 0;
     state.chips = [];
     state.chipLockTimer = 0;
     state.wave = startWave || 1;
+    // seed with bosses that would have been defeated before this wave so debug
+    // starts at later waves still produce the correct tier
+    state.bossesSpawned = Math.floor((state.wave - 1) / BOSS_EVERY_N_WAVES);
     state.wavePhase = "active";
     state.waveTimer = 0;
     state.waveXpRemaining = waveXpBudget(state.wave);
@@ -454,7 +475,8 @@
     announceWave();
     if (isBossWave(state.wave)) {
       state.bossesSpawned += 1;
-      spawnBoss(state.bossesSpawned);
+      if (state.wave === MAX_WAVES) spawnSummoner(state.bossesSpawned);
+      else spawnBoss(state.bossesSpawned);
     }
     rebuildChips();
     primeAudio();
@@ -711,6 +733,77 @@
     rebuildChips();
   }
 
+  function spawnSummon(parent) {
+    const spec = TYPES.summon;
+    const eq = spec.eq(state.config.maxNum);
+    // pick a random spot on the playfield, biased away from the boss
+    let x = W / 2, y = playerY / 2;
+    const minX = 40, maxX = W - 40;
+    const minY = TOP_SPAWN_Y + spec.radius + 20;
+    const maxY = playerY - 60;
+    for (let i = 0; i < 20; i++) {
+      x = minX + Math.random() * (maxX - minX);
+      y = minY + Math.random() * (maxY - minY);
+      if (Math.hypot(x - parent.x, y - parent.y) >= parent.radius + 40) break;
+    }
+    state.enemies.push({
+      type: "summon",
+      parent,
+      x, y, lane: null,
+      text: eq.text, answer: eq.answer,
+      hp: spec.hp, maxHp: spec.hp,
+      radius: spec.radius,
+      speed: spec.speed,
+      color: spec.color,
+      xpReward: spec.xp,
+      spawnFade: 0,
+      timeLeft: spec.lifetime,
+    });
+    rebuildChips();
+  }
+
+  function spawnSummoner(tier) {
+    // wipe the screen — same dramatic entrance as the mirror boss
+    for (const e of state.enemies) {
+      state.deaths.push({
+        x: e.x, y: e.y,
+        life: 0.45, maxLife: 0.45,
+        color: e.color,
+        radius: e.radius,
+      });
+    }
+    state.enemies = [];
+
+    const hp = 2 + tier * 2 + randInt(0, 1);
+    const radius = 50 + tier * 10;
+    const color = BOSS_COLORS[Math.floor(Math.random() * BOSS_COLORS.length)];
+    const xpReward = 100 * tier;
+    const speed = 8 + tier * 2;
+    const lane = 1;
+    const x = laneX(lane);
+    const y = BOSS_SPAWN_Y;
+
+    const boss = {
+      type: "boss",
+      subtype: "summoner",
+      tier,
+      x, y, lane,
+      // no text/answer — the summoner is permanently invulnerable
+      hp, maxHp: hp,
+      radius, speed, color, xpReward,
+      invulnerable: true,
+      spawnFade: 0,
+      summonCooldown: 0,
+    };
+    state.enemies.push(boss);
+
+    // initial wave of minions
+    for (let i = 0; i < SUMMONER_MINIONS; i++) spawnSummon(boss);
+
+    state.bossAlertTimer = 1.5;
+    rebuildChips();
+  }
+
   function activateBoss(boss) {
     boss.invulnerable = false;
     boss.phase = 2;
@@ -791,6 +884,7 @@
     state.streak += 1;
     if (state.streak > state.bestStreak) state.bestStreak = state.streak;
 
+    const summonersHit = new Map();
     for (let k = matches.length - 1; k >= 0; k--) {
       const idx = matches[k];
       const e = state.enemies[idx];
@@ -815,6 +909,9 @@
         state.waveXpEarned += e.xpReward;
         if (state.charge < state.config.chargeMax) state.charge += 1;
         if (e.type === "ice") state.freezeTimer = FREEZE_DURATION;
+        if (e.type === "summon" && e.parent) {
+          summonersHit.set(e.parent, (summonersHit.get(e.parent) || 0) + 1);
+        }
 
         // last mini-boss of a parent killed → activate the boss
         if (e.type === "mini" && e.parent) {
@@ -844,6 +941,41 @@
         e.answer = eq.answer;
       }
     }
+
+    // Each summon kill removes 1 HP from its summoner. When HP hits 0, the
+    // boss dies and any remaining minions go with it.
+    if (summonersHit.size > 0) {
+      for (const [boss, hits] of summonersHit) {
+        boss.hp -= hits;
+        if (boss.hp <= 0) {
+          const bossIdx = state.enemies.indexOf(boss);
+          if (bossIdx >= 0) {
+            state.deaths.push({
+              x: boss.x, y: boss.y,
+              life: 0.7, maxLife: 0.7,
+              color: boss.color, radius: boss.radius,
+            });
+            state.enemies.splice(bossIdx, 1);
+            gainXp(boss.xpReward);
+            gainScore(boss.xpReward);
+            state.waveXpEarned += boss.xpReward;
+          }
+          // sweep any minions still tied to this boss
+          for (let j = state.enemies.length - 1; j >= 0; j--) {
+            const oth = state.enemies[j];
+            if (oth.type === "summon" && oth.parent === boss) {
+              state.deaths.push({
+                x: oth.x, y: oth.y,
+                life: 0.45, maxLife: 0.45,
+                color: oth.color, radius: oth.radius,
+              });
+              state.enemies.splice(j, 1);
+            }
+          }
+        }
+      }
+    }
+
     rebuildChips();
     return true;
   }
@@ -981,7 +1113,8 @@
     announceWave();
     if (isBossWave(state.wave)) {
       state.bossesSpawned += 1;
-      spawnBoss(state.bossesSpawned);
+      if (state.wave === MAX_WAVES) spawnSummoner(state.bossesSpawned);
+      else spawnBoss(state.bossesSpawned);
     }
   }
 
@@ -1001,6 +1134,8 @@
       if (state.wave >= MAX_WAVES) {
         // run complete — show the score screen instead of advancing
         state.gameOver = true;
+        gameOverTitleEl.textContent = "You've done it!";
+        gameOverTitleEl.classList.add("victory");
         finalScoreEl.textContent = `Score: ${state.score.toLocaleString("en-US")} · Wave: ${state.wave} · Best streak: ${state.bestStreak}`;
       } else {
         state.wavePhase = "breather";
@@ -1031,6 +1166,22 @@
     for (let i = state.deaths.length - 1; i >= 0; i--) {
       state.deaths[i].life -= dt;
       if (state.deaths[i].life <= 0) state.deaths.splice(i, 1);
+    }
+
+    // SUMMONER: top up minions toward SUMMONER_MINIONS, one at a time, with a
+    // small delay so they don't pop back the instant one dies.
+    if (!frozen) {
+      for (const e of state.enemies) {
+        if (e.type !== "boss" || e.subtype !== "summoner") continue;
+        e.summonCooldown = Math.max(0, e.summonCooldown - dt);
+        if (e.summonCooldown > 0) continue;
+        let count = 0;
+        for (const m of state.enemies) if (m.type === "summon" && m.parent === e) count++;
+        if (count < SUMMONER_MINIONS) {
+          spawnSummon(e);
+          e.summonCooldown = SUMMONER_SPAWN_DELAY;
+        }
+      }
     }
 
     for (let i = state.enemies.length - 1; i >= 0; i--) {
@@ -1123,6 +1274,8 @@
 
           if (state.lives <= 0) {
             state.gameOver = true;
+            gameOverTitleEl.textContent = "Game Over";
+            gameOverTitleEl.classList.remove("victory");
             finalScoreEl.textContent = `Score: ${state.score.toLocaleString("en-US")} · Wave: ${state.wave} · Best streak: ${state.bestStreak}`;
           }
           rebuildChips();
@@ -1309,22 +1462,34 @@
     ctx.lineWidth = spec.shape === "boss" ? 3 : 2;
     ctx.stroke();
 
-    // ice lifetime ring + snowflake symbol
+    // lifetime ring + symbol (ice: snowflake/blue, summon: sparkle/purple)
     if (spec.lifetime) {
       const frac = Math.max(0, e.timeLeft / spec.lifetime);
+      const isSummon = e.type === "summon";
       ctx.beginPath();
       ctx.arc(e.x, e.y, e.radius + 5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
-      ctx.strokeStyle = frac < 0.3 ? "#f87171" : "rgba(125, 211, 252, 0.75)";
+      if (isSummon) {
+        ctx.strokeStyle = frac < 0.3 ? "#fbbf24" : "rgba(192, 132, 252, 0.85)";
+      } else {
+        ctx.strokeStyle = frac < 0.3 ? "#f87171" : "rgba(125, 211, 252, 0.75)";
+      }
       ctx.lineWidth = 2.5;
       ctx.stroke();
 
       ctx.font = "bold 16px ui-monospace, monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "#e0f2fe";
-      ctx.shadowColor = "#7dd3fc";
-      ctx.shadowBlur = 8;
-      ctx.fillText("❄", e.x, e.y + 1);
+      if (isSummon) {
+        ctx.fillStyle = "#f5d0fe";
+        ctx.shadowColor = "#c084fc";
+        ctx.shadowBlur = 10;
+        ctx.fillText("✦", e.x, e.y + 1);
+      } else {
+        ctx.fillStyle = "#e0f2fe";
+        ctx.shadowColor = "#7dd3fc";
+        ctx.shadowBlur = 8;
+        ctx.fillText("❄", e.x, e.y + 1);
+      }
       ctx.shadowBlur = 0;
     }
 
@@ -1350,9 +1515,9 @@
       ctx.font = "bold 12px ui-monospace, Menlo, monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      const label = e.invulnerable
-        ? `✦ THE MIRROR ✦`
-        : `✦ ЯOЯЯIM ƎHT ✦`;
+      let label;
+      if (e.subtype === "summoner") label = `✦ THE SUMMONER ✦`;
+      else label = e.invulnerable ? `✦ THE MIRROR ✦` : `✦ ЯOЯЯIM ƎHT ✦`;
       ctx.fillText(label, e.x, e.y - 6);
 
       const barW = e.radius * 1.5;
@@ -1666,6 +1831,9 @@
   // #bossDebugBtn markup/CSS when the boss tuning pass is done.
   bossDebugBtnEl.addEventListener("click", () => {
     startGame(selectedDiff, { startWave: BOSS_EVERY_N_WAVES });
+  });
+  boss2DebugBtnEl.addEventListener("click", () => {
+    startGame(selectedDiff, { startWave: MAX_WAVES });
   });
 
   restartBtnEl.addEventListener("click", () => location.reload());

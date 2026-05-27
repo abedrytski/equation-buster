@@ -385,6 +385,10 @@ body {
   letter-spacing: 4px;
 }
 
+#gameover h1.victory {
+  color: #34d399;
+}
+
 .goBtns {
   display: flex;
   gap: 12px;
