@@ -36,6 +36,9 @@
   const MAX_LIVES = 3;
   const MAX_INPUT_LEN = 4;
   const MAX_CHIPS = 6;
+  // When true, every answer (right or wrong) reshuffles the chip positions so
+  // the player can't memorize a slot. Set to false to keep positions stable.
+  const SHUFFLE_CHIPS_ON_ANSWER = true;
   const CHIP_WRONG_LOCK = 0.35;
   const WRONG_PUSH_PX = 22;
   const WRONG_FLASH_DURATION = 0.4;
@@ -878,6 +881,7 @@
         if (en.speed === 0) continue;          // ice doesn't approach
         en.y += WRONG_PUSH_PX;
       }
+      if (SHUFFLE_CHIPS_ON_ANSWER) rebuildChips(true);
       return false;
     }
 
@@ -976,7 +980,7 @@
       }
     }
 
-    rebuildChips();
+    rebuildChips(SHUFFLE_CHIPS_ON_ANSWER);
     return true;
   }
 
@@ -989,7 +993,7 @@
 
   // ---------- chip-based input (mobile)
 
-  function rebuildChips() {
+  function rebuildChips(shuffle = false) {
     if (!state.started || state.gameOver) {
       state.chips = [];
       renderChips();
@@ -1048,6 +1052,15 @@
         guard++;
       } while (chips.includes(cand) && guard < 200);
       chips[i] = cand;
+    }
+
+    // optional shuffle: randomize all slots so the player can't memorize where
+    // a given answer always lives. Only used when the caller asks for it.
+    if (shuffle) {
+      for (let i = chips.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [chips[i], chips[j]] = [chips[j], chips[i]];
+      }
     }
 
     state.chips = chips;
