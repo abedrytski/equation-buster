@@ -21,13 +21,14 @@
   const changeDiffBtnEl = document.getElementById("changeDiffBtn");
   const diffBtnEls = document.querySelectorAll(".diffBtn");
   const trainBtnEls = document.querySelectorAll(".trainBtn");
-  const chargeEl = document.getElementById("charge");
-  const chargeValEl = document.getElementById("chargeVal");
   const trainingBadgeEl = document.getElementById("trainingBadge");
   const trainingNumEl = document.getElementById("trainingNum");
   const bossAlertEl = document.getElementById("bossAlert");
   const inputBoxEl = document.getElementById("inputBox");
   const chipBarEl = document.getElementById("chipBar");
+  const bgmEl = document.getElementById("bgm");
+  const bossBgmEl = document.getElementById("bossBgm");
+  const muteBtnEl = document.getElementById("muteBtn");
 
   const PLAYER_RADIUS = 14;
   const MAX_LIVES = 3;
@@ -263,24 +264,24 @@
 
   const BOSS_COLORS = ["#a78bfa", "#f87171", "#fb923c", "#fbbf24", "#34d399", "#22d3ee"];
 
-  // weighted spawn table per level (last entry used for higher levels)
+  // weighted spawn table per wave (last entry used for higher waves)
   const SPAWN_TABLE = [
-    { yellow: 1 },                                                    // L1
-    { yellow: 4, ice: 1 },                                          // L2
-    { yellow: 3, ice: 1, pink: 2 },                                 // L3
-    { yellow: 2, ice: 1, pink: 2, green: 2 },                       // L4
-    { yellow: 2, ice: 1, pink: 2, green: 2, blue: 2 },              // L5
-    { yellow: 2, ice: 1, pink: 2, green: 2, blue: 2, hexagon: 1 },  // L6+
+    { yellow: 1 },                                                    // W1
+    { yellow: 4, ice: 1 },                                          // W2
+    { yellow: 3, ice: 1, pink: 2 },                                 // W3
+    { yellow: 2, ice: 1, pink: 2, green: 2 },                       // W4
+    { yellow: 2, ice: 1, pink: 2, green: 2, blue: 2 },              // W5
+    { yellow: 2, ice: 1, pink: 2, green: 2, blue: 2, hexagon: 1 },  // W6+
   ];
 
-  function spawnTableForLevel(level, cfg) {
+  function spawnTableForWave(wave, cfg) {
     const table = (cfg && cfg.spawnTable) || SPAWN_TABLE;
-    const i = Math.min(level, table.length) - 1;
+    const i = Math.min(wave, table.length) - 1;
     return table[Math.max(0, i)];
   }
 
-  function pickType(level, cfg, maxXp, exclude) {
-    const t = spawnTableForLevel(level, cfg);
+  function pickType(wave, cfg, maxXp, exclude) {
+    const t = spawnTableForWave(wave, cfg);
     const usable = {};
     let total = 0;
     for (const k in t) {
@@ -314,17 +315,17 @@
     // soft gate: only useful when enough movers are around to be slowed
     let movers = 0;
     for (const e of state.enemies) if (e.speed > 0) movers++;
-    const need = Math.max(2, Math.ceil(maxEnemiesForLevel(state.level) * 0.6));
+    const need = Math.max(2, Math.ceil(maxEnemiesForWave(state.wave) * 0.6));
     return movers >= need;
   }
 
-  function spawnIntervalForLevel(level, cfg) {
-    return Math.max(cfg.spawnMin, cfg.spawnBase * Math.pow(cfg.spawnDecay, level - 1));
+  function spawnIntervalForWave(wave, cfg) {
+    return Math.max(cfg.spawnMin, cfg.spawnBase * Math.pow(cfg.spawnDecay, wave - 1));
   }
 
-  function levelSpeedFactor(level) {
-    // grows ~5 % per level, capped at 2.0x. Sub-exponential ramp.
-    return Math.min(2.0, 1 + (level - 1) * 0.05);
+  function waveSpeedFactor(wave) {
+    // grows ~5 % per wave, capped at 2.0x. Sub-exponential ramp.
+    return Math.min(2.0, 1 + (wave - 1) * 0.05);
   }
 
   function xpToNext(level) {
@@ -393,6 +394,8 @@
     wrongFlashTimer: 0,
     score: 0,
     scorePopTimer: 0,
+    musicStarted: false,
+    musicMuted: false,
   };
 
   const FREEZE_DURATION = 3;
@@ -438,7 +441,62 @@
       spawnBoss(state.bossesSpawned);
     }
     rebuildChips();
+    ensureMusicStarted();
   }
+
+  // ---------- music
+
+  const MUSIC_BG_VOL = 0.45;
+  const MUSIC_BOSS_VOL = 0.55;
+  const MUSIC_FADE_RATE = 1.6; // volume per second toward target
+
+  function ensureMusicStarted() {
+    // call after a user gesture; safe to call repeatedly
+    if (state.musicStarted) return;
+    bgmEl.volume = 0;
+    bossBgmEl.volume = 0;
+    const p1 = bgmEl.play();
+    const p2 = bossBgmEl.play();
+    if (p1 && p1.catch) p1.catch(() => {});
+    if (p2 && p2.catch) p2.catch(() => {});
+    state.musicStarted = true;
+  }
+
+  function musicTargets() {
+    // returns [bgTarget, bossTarget] in [0, 1]
+    if (state.musicMuted) return [0, 0];
+    if (!state.started || state.gameOver || state.paused) return [0, 0];
+    const bossAlive = state.enemies.some((e) => e.type === "boss");
+    return bossAlive ? [0, MUSIC_BOSS_VOL] : [MUSIC_BG_VOL, 0];
+  }
+
+  function approach(curr, target, step) {
+    if (curr < target) return Math.min(target, curr + step);
+    if (curr > target) return Math.max(target, curr - step);
+    return curr;
+  }
+
+  function updateMusic(dt) {
+    const [bgT, bossT] = musicTargets();
+    const step = MUSIC_FADE_RATE * dt;
+    bgmEl.volume = approach(bgmEl.volume, bgT, step);
+    bossBgmEl.volume = approach(bossBgmEl.volume, bossT, step);
+  }
+
+  function setMuted(muted) {
+    state.musicMuted = muted;
+    try { localStorage.setItem("ms_muted", muted ? "1" : "0"); } catch (_) { /* ignore */ }
+    muteBtnEl.classList.toggle("muted", muted);
+    muteBtnEl.textContent = muted ? "🔇" : "🔊";
+  }
+
+  // restore mute preference; bind toggle
+  try { state.musicMuted = localStorage.getItem("ms_muted") === "1"; } catch (_) { /* ignore */ }
+  setMuted(state.musicMuted);
+  muteBtnEl.addEventListener("click", () => {
+    setMuted(!state.musicMuted);
+    ensureMusicStarted();
+  });
 
   function announceWave() {
     state.levelUpTimer = 1.0;
@@ -456,34 +514,46 @@
     rebuildChips();
   }
 
-  function maxEnemiesForLevel(level) {
+  function maxEnemiesForWave(wave) {
     const cfg = state.config;
     const add = cfg ? cfg.enemyCapAdd : 3;
     const cap = cfg ? cfg.enemyCapMax : 5;
-    return Math.min(cap, level + add);
+    return Math.min(cap, wave + add);
   }
 
-  function pickLeastBusyLane() {
-    // pick the lane with the fewest live moving enemies (helps spread spawns)
+  const SPAWN_HEAD_CLEARANCE = 90;
+  const LANE_SEPARATION_GAP = 8;
+
+  function pickSpawnLane() {
+    // rank lanes by busy-ness (count asc), tie-break by topmost-enemy y desc
+    // (more clearance preferred), then small randomness. Return -1 if no lane
+    // has spawn clearance — caller defers the spawn so enemies don't pile up.
     const counts = new Array(NUM_LANES).fill(0);
+    const tops = new Array(NUM_LANES).fill(Infinity);
     for (const e of state.enemies) {
-      if (e.lane != null && e.speed > 0) counts[e.lane]++;
+      if (e.lane == null || e.speed <= 0 || e.type === "mini") continue;
+      counts[e.lane]++;
+      if (e.y < tops[e.lane]) tops[e.lane] = e.y;
     }
-    let best = 0, bestN = counts[0];
-    // add small randomness when tied
-    for (let i = 1; i < NUM_LANES; i++) {
-      if (counts[i] < bestN || (counts[i] === bestN && Math.random() < 0.4)) {
-        best = i; bestN = counts[i];
-      }
+    const order = [];
+    for (let i = 0; i < NUM_LANES; i++) order.push(i);
+    order.sort((a, b) => {
+      if (counts[a] !== counts[b]) return counts[a] - counts[b];
+      const ta = tops[a] === Infinity ? 1e9 : tops[a];
+      const tb = tops[b] === Infinity ? 1e9 : tops[b];
+      if (ta !== tb) return tb - ta;
+      return Math.random() - 0.5;
+    });
+    for (const l of order) {
+      if (tops[l] === Infinity || tops[l] >= SPAWN_HEAD_CLEARANCE) return l;
     }
-    return best;
+    return -1;
   }
 
   function spawnEnemy(maxXp) {
     const exclude = iceAllowedNow() ? null : new Set(["ice"]);
-    const type = pickType(state.level, state.config, maxXp, exclude);
+    const type = pickType(state.wave, state.config, maxXp, exclude);
     const spec = TYPES[type];
-    if (type === "ice") state.iceSpawnedThisWave++;
 
     let lane, x, y;
     if (spec.speed === 0) {
@@ -493,11 +563,14 @@
       const topZoneBottom = Math.max(140, playerY * 0.55);
       y = 80 + Math.random() * Math.max(40, topZoneBottom - 80);
     } else {
-      // moving enemies drop in from above in a lane
-      lane = pickLeastBusyLane();
+      // moving enemies drop in from above; defer if no lane has clearance
+      lane = pickSpawnLane();
+      if (lane < 0) return 0;
       x = laneX(lane);
       y = -(spec.radius + 40);
     }
+
+    if (type === "ice") state.iceSpawnedThisWave++;
 
     const eq = spec.eq(state.config.maxNum, state.config.trainingTargets);
     const enemy = {
@@ -894,11 +967,11 @@
     if (!frozen) {
       state.spawnTimer -= dt;
       if (state.spawnTimer <= 0) {
-        if (canSpawn && state.enemies.length < maxEnemiesForLevel(state.level)) {
+        if (canSpawn && state.enemies.length < maxEnemiesForWave(state.wave)) {
           const cost = spawnEnemy(state.waveXpRemaining);
           state.waveXpRemaining = Math.max(0, state.waveXpRemaining - cost);
         }
-        state.spawnTimer = spawnIntervalForLevel(state.level, state.config);
+        state.spawnTimer = spawnIntervalForWave(state.wave, state.config);
       }
     }
 
@@ -942,11 +1015,25 @@
         }
 
         // straight-down lane movement
-        const v = e.speed * state.config.speedMult * levelSpeedFactor(state.level);
+        const v = e.speed * state.config.speedMult * waveSpeedFactor(state.wave);
         e.y += v * dt;
         // gentle x easing back toward lane center (in case of any drift)
         const targetX = laneX(e.lane != null ? e.lane : 1);
         e.x += (targetX - e.x) * Math.min(1, dt * 4);
+
+        // queue-up: prevent overlap with the closest enemy ahead in this lane.
+        // A faster enemy will stop short of the slower leader's tail.
+        let leader = null;
+        for (const o of state.enemies) {
+          if (o === e || o.lane !== e.lane) continue;
+          if (o.speed <= 0 || o.type === "mini") continue;
+          if (o.y <= e.y) continue;
+          if (leader === null || o.y < leader.y) leader = o;
+        }
+        if (leader) {
+          const minSep = leader.radius + e.radius + LANE_SEPARATION_GAP;
+          if (leader.y - e.y < minSep) e.y = leader.y - minSep;
+        }
 
         // collision: enemy crosses the danger line
         if (e.y + e.radius * 0.4 >= playerY) {
@@ -1198,8 +1285,8 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       const label = e.invulnerable
-        ? `THE MIRROR T${e.tier} ✦`
-        : `THE MIRROR BOSS T${e.tier}${e.phase === 3 ? " !" : ""}`;
+        ? `✦ THE MIRROR ✦`
+        : `✦ ЯOЯЯIM ƎHT ✦`;
       ctx.fillText(label, e.x, e.y - 6);
 
       const barW = e.radius * 1.5;
@@ -1408,15 +1495,6 @@
     if (state.scorePopTimer > 0) scoreHudEl.classList.add("pop");
 
     if (state.config) {
-      if (state.charge >= state.config.chargeMax) {
-        chargeValEl.textContent = "READY";
-        chargeEl.className = "ready";
-        chargeEl.disabled = false;
-      } else {
-        chargeValEl.textContent = `${state.charge}/${state.config.chargeMax}`;
-        chargeEl.className = "";
-        chargeEl.disabled = true;
-      }
       if (state.config.trainingTargets && state.config.trainingTargets.length) {
         trainingNumEl.textContent = state.config.trainingTargets.join(", ");
         trainingBadgeEl.hidden = false;
@@ -1425,7 +1503,6 @@
       }
     } else {
       trainingBadgeEl.hidden = true;
-      chargeEl.disabled = true;
     }
 
     if (state.input === "") {
@@ -1447,6 +1524,7 @@
     last = now;
     update(dt);
     render();
+    updateMusic(dt);
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
@@ -1520,12 +1598,6 @@
 
   diffBtnEls.forEach((btn) => {
     btn.addEventListener("click", () => startGame(btn.dataset.diff, selectionOpts()));
-  });
-
-  chargeEl.addEventListener("click", (ev) => {
-    ev.preventDefault();
-    if (!state.started || state.gameOver || state.paused) return;
-    fireCharge();
   });
 
   restartBtnEl.addEventListener("click", () => {

@@ -10,6 +10,7 @@
   <body>
     <div id="stage">
     <canvas id="game"></canvas>
+    <div id="topMask"></div>
 
     <div id="hud">
       <div id="hudLeft">
@@ -20,11 +21,8 @@
         <span id="scoreValue">0</span>
       </div>
       <div id="hudRightAdd">
-        <button id="charge" type="button" aria-label="bomb">
-          <span class="ico">⚡</span>
-          <span id="chargeVal">0/15</span>
-        </button>
         <span id="lives" aria-label="lives"></span>
+        <button id="muteBtn" type="button" aria-label="mute music">🔊</button>
       </div>
     </div>
     <div id="xpBar"><div id="xpFill"></div></div>
@@ -110,6 +108,8 @@
     </div>
 
     </div>
+    <audio id="bgm" src="./music/background.mp3" loop preload="auto"></audio>
+    <audio id="bossBgm" src="./music/boss.mp3" loop preload="auto"></audio>
     <script src="./game.js"></script>
   </body>
 </html>
