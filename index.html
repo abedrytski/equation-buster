@@ -25,8 +25,8 @@
         <button id="muteBtn" type="button" aria-label="mute music">🔊</button>
       </div>
     </div>
-    <div id="xpBar">
-      <div id="xpFill"></div>
+    <div id="waveBar">
+      <div id="waveFill"></div>
       <div class="waveTick tick1"></div>
       <div class="waveTick tick2"></div>
     </div>
@@ -55,8 +55,6 @@
         <button class="diffBtn selected" data-diff="easy">EASY</button>
         <button class="diffBtn" data-diff="medium">MEDIUM</button>
         <button class="diffBtn" data-diff="hard">HARD</button>
-        <button id="bossDebugBtn" type="button" title="debug: jump to T1 boss" hidden>BOSS</button>
-        <button id="boss2DebugBtn" type="button" title="debug: jump to the SUMMONER (wave 6)" hidden>BOSS 2</button>
       </div>
     </div>
 
@@ -72,6 +70,6 @@
     </div>
     <audio id="bgm" src="./music/background.mp3" loop preload="auto"></audio>
     <audio id="bossBgm" src="./music/boss.mp3" loop preload="auto"></audio>
-    <script src="./game.js"></script>
+    <script type="module" src="./src/main.js"></script>
   </body>
 </html>
