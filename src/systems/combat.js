@@ -2,18 +2,43 @@
 // summoner damage, the wrong-answer punishment, and ending the run.
 
 import { state } from "../core/state.js";
-import { TYPES, WRONG_FLASH_DURATION, WRONG_PUSH_PX, SHUFFLE_CHIPS_ON_ANSWER, MAX_LIVES } from "../core/config.js";
-import { gainScore } from "./waves.js";
+import { WRONG_FLASH_DURATION, WRONG_PUSH_PX, SHUFFLE_CHIPS_ON_ANSWER, MAX_LIVES } from "../core/config.js";
+import { getEnemyDef } from "./enemies/index.js";
+import { gainScore, computeStars } from "./waves.js";
 import { spawnDeath, sharedEq } from "./entities.js";
 import { getBossDef } from "./bosses/index.js";
 import { rebuildChips } from "./chips.js";
-import { gameOverTitleEl, finalScoreEl } from "../core/dom.js";
+import { gameOverTitleEl, finalScoreEl, victoryStarsEl } from "../core/dom.js";
+import { recordLevelWin } from "../lib/progress.js";
 
 export function endGame(title, victory) {
   state.gameOver = true;
   gameOverTitleEl.textContent = title;
   gameOverTitleEl.classList.toggle("victory", victory);
-  finalScoreEl.textContent = `Score: ${state.score.toLocaleString("en-US")} · Wave: ${state.wave} · Best streak: ${state.bestStreak}`;
+  finalScoreEl.textContent = `Score: ${state.score.toLocaleString("en-US")} · Best streak: ${state.bestStreak}`;
+
+  if (victory) {
+    const stars = state.lastStars;
+    const starEls = victoryStarsEl.querySelectorAll(".vStar");
+    starEls.forEach((el, i) => el.classList.toggle("earned", i < stars));
+    victoryStarsEl.hidden = false;
+    // restart the staggered pop-in animation from scratch each win
+    victoryStarsEl.classList.remove("show");
+    void victoryStarsEl.offsetWidth; // force reflow so the animation replays
+    victoryStarsEl.classList.add("show");
+  } else {
+    victoryStarsEl.hidden = true;
+    victoryStarsEl.classList.remove("show");
+  }
+}
+
+// Called when a level is cleared. Computes the star rating, persists progress
+// for the signed-in user, then shows the victory screen.
+export function winLevel() {
+  const stars = computeStars();
+  state.lastStars = stars;
+  recordLevelWin(state.selectedWorld, state.selectedLevel, state.score, stars);
+  endGame("Level Complete!", true);
 }
 
 // Apply a bonus enemy's on-kill `effect` payload (see TYPES bonus entries).
@@ -56,7 +81,7 @@ export function fireAnswer(answer) {
   for (let k = matches.length - 1; k >= 0; k--) {
     const idx = matches[k];
     const e = state.enemies[idx];
-    const spec = TYPES[e.type];
+    const spec = getEnemyDef(e);
 
     state.lasers.push({
       x: e.x, y: e.y,

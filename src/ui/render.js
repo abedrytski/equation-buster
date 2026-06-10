@@ -4,14 +4,22 @@
 import { state } from "../core/state.js";
 import { ctx } from "../core/dom.js";
 import { W, H, playerX, playerY, laneX } from "../core/view.js";
-import { GRID_SIZE, NUM_LANES, MAX_LIVES, MAX_WAVES, WRONG_FLASH_DURATION, TYPES } from "../core/config.js";
+import { GRID_SIZE, NUM_LANES, MAX_LIVES, WRONG_FLASH_DURATION } from "../core/config.js";
+import { TYPES } from "../systems/enemies/index.js";
 import { cycleProgress, streakMult, streakTierClass, isBossWave } from "../systems/waves.js";
 import { getBossDef } from "../systems/bosses/index.js";
+import { LEVELS_PER_WORLD, NUM_WORLDS, WORLD_NAMES } from "../core/config.js";
+import { getCurrentUser } from "../lib/auth.js";
+import * as progress from "../lib/progress.js";
 import {
-  livesEl, waveTextEl, waveFillEl, tick1El, tick2El, waveAnnounceEl,
+  livesEl, waveTextEl, waveFillEl, waveBarEl, tick1El, tick2El, waveAnnounceEl,
   breatherEl, breatherCountEl, streakEl, streakValueEl, streakMultEl,
-  scoreHudEl, scoreValueEl, startScreenEl, gameOverEl, bossAlertEl,
-  pausedEl, inputBoxEl, inputValueEl,
+  scoreHudEl, scoreValueEl, homeScreenEl, worldScreenEl, gameOverEl, bossAlertEl,
+  pausedEl, inputBoxEl, inputValueEl, worldNavTitleEl, worldPrevBtnEl, worldNextBtnEl,
+  worldProgressFillEl, worldProgressTextEl, worldPlayLabelEl,
+  worldHeaderKickerEl, worldHeaderNameEl, worldStarBadgeEl,
+  homeWorldKickerEl, homeWorldNameEl, homeWorldFillEl, homeWorldProgressEl,
+  homePointsEl, homeStarsEl, homePlaySubEl, profileNameEl, profileAvatarEl, profileStarsEl,
 } from "../core/dom.js";
 
 // ---------- primitive shapes
@@ -312,23 +320,147 @@ function drawLanesAndDangerLine() {
   ctx.restore();
 }
 
+// Draw curved connecting paths between level nodes in the world map
+function renderLevelMapPaths() {
+  const svg = document.querySelector(".levelMapSvg");
+  if (!svg) return;
+
+  const nodes = Array.from(document.querySelectorAll(".levelMap .node[data-level]"));
+  if (nodes.length < 2) return;
+
+  // Clear previous paths
+  svg.querySelectorAll("path").forEach((p) => p.remove());
+
+  // Draw bezier curves connecting consecutive nodes
+  for (let i = 0; i < nodes.length - 1; i++) {
+    const from = nodes[i].getBoundingClientRect();
+    const to = nodes[i + 1].getBoundingClientRect();
+    const svgRect = svg.getBoundingClientRect();
+
+    // Convert to SVG coordinate space (relative to levelMap)
+    const fromX = from.left - svgRect.left + from.width / 2;
+    const fromY = from.top - svgRect.top + from.height / 2;
+    const toX = to.left - svgRect.left + to.width / 2;
+    const toY = to.top - svgRect.top + to.height / 2;
+
+    // Quadratic bezier curve with control point offset horizontally
+    const midY = (fromY + toY) / 2;
+    const cpX = (fromX + toX) / 2 + 40; // offset control point to create curve
+    const cpY = midY;
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute(
+      "d",
+      `M ${fromX} ${fromY} Q ${cpX} ${cpY} ${toX} ${toY}`
+    );
+    path.setAttribute("stroke", "rgba(148, 163, 184, 0.3)");
+    path.setAttribute("stroke-width", "2");
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke-dasharray", "8 4");
+    svg.appendChild(path);
+  }
+}
+
+// ---------- menu screens (home + world selection), driven by saved progress
+
+function renderHomeScreen() {
+  const f = progress.getFurthest();
+  homeWorldKickerEl.textContent = `World ${f.world}`;
+  homeWorldNameEl.textContent = WORLD_NAMES[f.world] || `World ${f.world}`;
+  const done = progress.completedInWorld(f.world);
+  homeWorldFillEl.style.width = `${((done / LEVELS_PER_WORLD) * 100).toFixed(0)}%`;
+  homeWorldProgressEl.textContent = `${done}/${LEVELS_PER_WORLD}`;
+  homePointsEl.textContent = progress.getTotalPoints().toLocaleString("en-US");
+  homeStarsEl.textContent = String(progress.getTotalStars());
+  const lvlLabel = f.level >= LEVELS_PER_WORLD ? "Boss" : `Level ${f.level}`;
+  const verb = progress.getTotalPoints() > 0 ? "Continue" : "Start";
+  homePlaySubEl.textContent = `${verb} · ${lvlLabel}`;
+
+  const user = getCurrentUser();
+  if (user?.email) {
+    const name = user.email.split("@")[0];
+    profileNameEl.textContent = name;
+    profileAvatarEl.textContent = name.charAt(0).toUpperCase();
+  }
+  profileStarsEl.textContent = `${progress.getTotalStars()} ★`;
+}
+
+function renderWorldScreen() {
+  const w = state.currentWorld;
+  worldNavTitleEl.textContent = `World ${w}`;
+  worldHeaderKickerEl.textContent = `World ${w}`;
+  worldHeaderNameEl.textContent = WORLD_NAMES[w] || `World ${w}`;
+  worldStarBadgeEl.textContent = String(progress.starsInWorld(w));
+  worldPrevBtnEl.disabled = w <= 1;
+  worldNextBtnEl.disabled = w >= NUM_WORLDS;
+
+  const done = progress.completedInWorld(w);
+  worldProgressFillEl.style.width = `${((done / LEVELS_PER_WORLD) * 100).toFixed(0)}%`;
+  worldProgressTextEl.textContent = `${done}/${LEVELS_PER_WORLD} levels`;
+
+  // keep the selection valid for this world
+  if (!progress.isUnlocked(w, state.selectedLevel)) {
+    state.selectedLevel = progress.defaultLevel(w);
+  }
+
+  for (let l = 1; l <= LEVELS_PER_WORLD; l++) {
+    const wrapper = document.querySelector(`.levelNodeWrapper[data-level="${l}"]`);
+    if (!wrapper) continue;
+    const node = wrapper.querySelector(".node");
+    const isBoss = l === LEVELS_PER_WORLD;
+    const unlocked = progress.isUnlocked(w, l);
+    const completed = progress.isCompleted(w, l);
+
+    node.dataset.unlocked = unlocked ? "true" : "false";
+    node.classList.toggle("locked", !unlocked);
+    node.classList.toggle("done", completed && !isBoss);
+    node.classList.toggle("boss", isBoss);
+    node.classList.toggle("current", unlocked && !completed && !isBoss);
+    node.classList.toggle("selected", l === state.selectedLevel);
+
+    const stars = progress.getStars(w, l);
+    const starRow = wrapper.querySelector(".levelStars");
+    starRow.querySelectorAll(".star").forEach((s, i) => s.classList.toggle("filled", i < stars));
+    starRow.style.visibility = completed ? "visible" : "hidden";
+  }
+
+  worldPlayLabelEl.textContent =
+    state.selectedLevel >= LEVELS_PER_WORLD ? "Boss Level" : `Level ${state.selectedLevel}`;
+
+  renderLevelMapPaths();
+}
+
 // ---------- HUD (DOM) updates
 
 function renderHud() {
   livesEl.textContent = "♥".repeat(state.lives) + "♡".repeat(MAX_LIVES - state.lives);
-  waveTextEl.innerHTML = `Wave <b>${state.wave}</b>/${MAX_WAVES}`;
+  if (state.bossLevel) {
+    waveTextEl.innerHTML = `<b>BOSS</b>`;
+  } else {
+    waveTextEl.innerHTML = `Wave <b>${state.wave}</b>/${state.totalWaves}`;
+  }
   const cp = cycleProgress();
   waveFillEl.style.clipPath = `inset(0 ${((1 - cp) * 100).toFixed(2)}% 0 0)`;
-  tick1El.classList.toggle("passed", cp >= 1 / 3);
-  tick2El.classList.toggle("passed", cp >= 2 / 3);
-  startScreenEl.hidden = state.started;
+  // boss levels show a continuous red HP-style bar with no segment ticks;
+  // regular (2-wave) levels show a single mid-point tick.
+  waveBarEl.classList.toggle("boss", state.bossLevel);
+  tick1El.hidden = state.bossLevel;
+  tick2El.hidden = true;  // only one tick now (mid-level), tick2 unused
+  tick1El.classList.toggle("passed", cp >= 0.5);
+  // pre-game menu: show home or world-selection; both hide once a run starts
+  const inMenu = !state.started && !state.gameOver;
+  homeScreenEl.hidden = !(inMenu && state.menuScreen === "home");
+  worldScreenEl.hidden = !(inMenu && state.menuScreen === "world");
   gameOverEl.hidden = !state.gameOver;
+
+  if (inMenu && state.menuScreen === "home") renderHomeScreen();
+  if (inMenu && state.menuScreen === "world") renderWorldScreen();
   bossAlertEl.hidden = state.bossAlertTimer <= 0;
   pausedEl.hidden = !state.paused;
 
   // wave announce flashes the new wave number when levelUpTimer is active.
   // Suppress it on boss waves so it doesn't overlap the BOSS alert.
-  if (state.levelUpTimer > 0 && !isBossWave(state.wave)) {
+  if (state.levelUpTimer > 0 && !isBossWave()) {
     waveAnnounceEl.textContent = `WAVE ${state.wave}`;
     waveAnnounceEl.hidden = false;
   } else {

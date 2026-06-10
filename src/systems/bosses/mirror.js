@@ -3,10 +3,12 @@
 // HP it enrages (phase 3: faster, 3-number equations).
 
 import { state } from "../../core/state.js";
-import { TYPES, BOSS_ORBIT_RADIUS, BOSS_ORBIT_SPEED, NUM_MINIS } from "../../core/config.js";
+import { BOSS_ORBIT_RADIUS, BOSS_ORBIT_SPEED, NUM_MINIS } from "../../core/config.js";
+import { TYPES } from "../enemies/index.js";
 import { randInt, eqAddOrSub, eqAdd3 } from "../../core/equations.js";
 import { sharedEq } from "../entities.js";
 import { rebuildChips } from "../chips.js";
+import { accrueMaxScore } from "../waves.js";
 import { createBoss } from "./shared.js";
 
 // difficulty curve: phase 3 (enraged) = 3-number add; phases 1-2 = add/subtract.
@@ -49,6 +51,7 @@ export default {
         value: miniSpec.value,
         spawnFade: 0,
       });
+      accrueMaxScore(miniSpec.value);
     }
 
     state.bossAlertTimer = 1.5;

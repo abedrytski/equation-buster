@@ -3,8 +3,15 @@
 
 import "./core/view.js";
 import { state } from "./core/state.js";
-import { MAX_INPUT_LEN } from "./core/config.js";
-import { diffBtnEls, startBtnEl, restartBtnEl, changeDiffBtnEl } from "./core/dom.js";
+import { MAX_INPUT_LEN, NUM_WORLDS } from "./core/config.js";
+import * as auth from "./lib/auth.js";
+import * as progress from "./lib/progress.js";
+import { initAuthUI, hideAuthScreen } from "./lib/authUI.js";
+import {
+  restartBtnEl, homeBtnEl, homePlayBtnEl,
+  worldCardBtnEl, worldBackBtnEl, worldPlayBtnEl, levelMapEl,
+  worldPrevBtnEl, worldNextBtnEl, worldNavTitleEl,
+} from "./core/dom.js";
 import { initChipDOM } from "./systems/chips.js";
 import { initAudio, updateMusic } from "./ui/audio.js";
 import { update } from "./systems/update.js";
@@ -16,6 +23,26 @@ import { startGame, goToStart } from "./game.js";
 
 initChipDOM();
 initAudio();
+
+// Once a user is signed in: load their saved progress, point the menus at the
+// furthest reached level, and reveal the game.
+async function onSignedIn(user) {
+  console.log("Signed in:", user.email);
+  hideAuthScreen();
+  await progress.initProgress();
+  const f = progress.getFurthest();
+  state.currentWorld = f.world;
+  state.selectedLevel = f.level;
+}
+
+// Initialize authentication
+auth.initAuth().then(() => {
+  if (auth.isAuthenticated()) {
+    onSignedIn(auth.getCurrentUser());
+  } else {
+    initAuthUI(onSignedIn);
+  }
+});
 
 // ---------- main loop
 
@@ -32,10 +59,13 @@ requestAnimationFrame(loop);
 
 // ---------- keyboard input
 
+
 window.addEventListener("keydown", (ev) => {
   if (!state.started) {
     if (ev.key === "Enter" || ev.key === " ") {
-      startGame(selectedDiff);
+      if (progress.isUnlocked(state.currentWorld, state.selectedLevel)) {
+        startGame(state.currentWorld, state.selectedLevel);
+      }
       ev.preventDefault();
     }
     return;
@@ -43,7 +73,7 @@ window.addEventListener("keydown", (ev) => {
 
   if (state.gameOver) {
     if (ev.key === "r" || ev.key === "R") {
-      startGame(state.diffKey);
+      startGame(state.selectedWorld, state.selectedLevel);
     } else if (ev.key === "c" || ev.key === "C") {
       goToStart();
     }
@@ -70,18 +100,54 @@ window.addEventListener("keydown", (ev) => {
   }
 });
 
-// ---------- start-screen + game-over buttons
+// ---------- menu navigation + level selection
 
-// selected difficulty on the start screen — clicking a diff button just
-// selects it; the START button launches the game with whatever is selected
-let selectedDiff = "easy";
-diffBtnEls.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    selectedDiff = btn.dataset.diff;
-    diffBtnEls.forEach((b) => b.classList.toggle("selected", b === btn));
+// Home → world-selection, opening at the furthest reached level
+function openWorldAtFurthest() {
+  const f = progress.getFurthest();
+  state.currentWorld = f.world;
+  state.selectedLevel = f.level;
+  state.menuScreen = "world";
+}
+homePlayBtnEl.addEventListener("click", openWorldAtFurthest);
+worldCardBtnEl.addEventListener("click", openWorldAtFurthest);
+
+// World-selection: tap an unlocked level node to select it
+if (levelMapEl) {
+  levelMapEl.addEventListener("click", (ev) => {
+    const node = ev.target.closest(".node[data-level]");
+    if (!node) return;
+    const level = parseInt(node.dataset.level, 10);
+    if (!progress.isUnlocked(state.currentWorld, level)) return;
+    state.selectedLevel = level;
   });
+}
+
+// World navigation — moving worlds resets the selection to that world's default
+if (worldPrevBtnEl) {
+  worldPrevBtnEl.addEventListener("click", () => {
+    state.currentWorld = Math.max(1, state.currentWorld - 1);
+    state.selectedLevel = progress.defaultLevel(state.currentWorld);
+  });
+}
+if (worldNextBtnEl) {
+  worldNextBtnEl.addEventListener("click", () => {
+    state.currentWorld = Math.min(NUM_WORLDS, state.currentWorld + 1);
+    state.selectedLevel = progress.defaultLevel(state.currentWorld);
+  });
+}
+
+// Start the selected level
+worldPlayBtnEl.addEventListener("click", () => {
+  if (!progress.isUnlocked(state.currentWorld, state.selectedLevel)) return;
+  startGame(state.currentWorld, state.selectedLevel);
 });
 
-startBtnEl.addEventListener("click", () => startGame(selectedDiff));
-restartBtnEl.addEventListener("click", () => location.reload());
-changeDiffBtnEl.addEventListener("click", goToStart);
+// Back button
+worldBackBtnEl.addEventListener("click", () => { state.menuScreen = "home"; });
+
+// Game over: replay the same level, or return home
+restartBtnEl.addEventListener("click", () => {
+  startGame(state.selectedWorld, state.selectedLevel);
+});
+homeBtnEl.addEventListener("click", goToStart);

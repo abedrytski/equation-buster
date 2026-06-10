@@ -51,3 +51,10 @@ export function eqAdd5(cap) {
   const m = operandCap(cap, 0.25, 2);
   return mkAdd5(m);
 }
+
+// Generic N-operand addition. Used by enemy eq functions when additional_terms > 0.
+export function mkAddN(count, eachMax) {
+  const nums = [];
+  for (let i = 0; i < count; i++) nums.push(randInt(1, eachMax));
+  return { text: nums.join("+"), answer: nums.reduce((s, n) => s + n, 0) };
+}

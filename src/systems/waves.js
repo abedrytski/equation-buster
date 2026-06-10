@@ -2,28 +2,32 @@
 // and the config tables — no rendering, no spawning.
 
 import { state } from "../core/state.js";
-import { TYPES, BOSS_EVERY_N_WAVES, STREAK_TIERS, MAX_ENEMIES } from "../core/config.js";
+import { STREAK_TIERS, MAX_ENEMIES } from "../core/config.js";
+import { TYPES } from "./enemies/index.js";
 
-export function isBossWave(wave) {
-  return wave % BOSS_EVERY_N_WAVES === 0;
+// A boss level is a single boss-only "wave". Driven by the run's bossLevel flag
+// (set in startGame) rather than a wave-number cadence.
+export function isBossWave() {
+  return state.bossLevel === true;
 }
 
 export function waveValueBudget(wave) {
-  if (isBossWave(wave)) return 0;
+  if (isBossWave()) return 0;
   // grows ~12 value per wave; e.g., w1=16, w2=28, w4=52, w5=64
   return 4 + wave * 8;
 }
 
-// progress across the full cycle of (BOSS_EVERY_N_WAVES - 1) regular waves
-// + 1 boss wave. Resets to 0 at the start of each new cycle (after a boss).
+// progress across the whole level. Boss levels track boss HP depletion;
+// regular levels divide the bar into `totalWaves` equal segments.
 export function cycleProgress() {
-  const cyclePos = (state.wave - 1) % BOSS_EVERY_N_WAVES;  // 0..N-1
-  const seg = 1 / BOSS_EVERY_N_WAVES;
-  return Math.min(1, cyclePos * seg + waveProgress() * seg);
+  if (isBossWave()) return waveProgress();
+  const total = Math.max(1, state.totalWaves);
+  const seg = 1 / total;
+  return Math.min(1, (state.wave - 1) * seg + waveProgress() * seg);
 }
 
 export function waveProgress() {
-  if (isBossWave(state.wave)) {
+  if (isBossWave()) {
     const boss = state.enemies.find((e) => e.type === "boss");
     if (!boss) return 1.0;
     return 1.0 - boss.hp / boss.maxHp;
@@ -41,16 +45,40 @@ export function waveProgress() {
   return Math.max(0, Math.min(1.0, 1 - remaining / budget));
 }
 
-export function streakMult() {
+// streak multiplier for an arbitrary streak count
+export function multForStreak(streak) {
   let m = 1;
-  for (const t of STREAK_TIERS) if (state.streak >= t.min) m = t.mult;
+  for (const t of STREAK_TIERS) if (streak >= t.min) m = t.mult;
   return m;
+}
+
+export function streakMult() {
+  return multForStreak(state.streak);
 }
 
 // each enemy contributes (value × 10) base points, multiplied by streak.
 export function gainScore(amount) {
   state.score += amount * 10 * streakMult();
   state.scorePopTimer = 0.18;
+}
+
+// Accrue a scoring enemy's contribution to the level's theoretical max score,
+// as if a flawless never-miss run killed it: the streak rises by one per kill,
+// so each successive enemy is worth more. Called at spawn time for every enemy
+// that awards score. `state.score / state.scoreMax` then yields the star ratio.
+export function accrueMaxScore(value) {
+  if (!value || value <= 0) return;
+  state.perfectKills += 1;
+  state.scoreMax += value * 10 * multForStreak(state.perfectKills);
+}
+
+// Stars for a completed level: 3 at ≥95% of max, 2 at ≥50%, else 1.
+export function computeStars() {
+  if (state.scoreMax <= 0) return 1;
+  const ratio = state.score / state.scoreMax;
+  if (ratio >= 0.95) return 3;
+  if (ratio >= 0.50) return 2;
+  return 1;
 }
 
 export function streakTierClass() {

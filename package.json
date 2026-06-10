@@ -1,0 +1,13 @@
+{
+  "name": "math-survivor",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Math-themed survival game",
+  "scripts": {
+    "dev": "deno run -A serve.ts",
+    "serve": "deno run -A serve.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0"
+  }
+}

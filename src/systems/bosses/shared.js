@@ -6,6 +6,7 @@ import { state } from "../../core/state.js";
 import { laneX } from "../../core/view.js";
 import { BOSS_COLORS, BOSS_SPAWN_Y } from "../../core/config.js";
 import { wipeEnemiesToDeaths } from "../entities.js";
+import { accrueMaxScore } from "../waves.js";
 
 export function createBoss(tier, { kind, hp, value, extra }) {
   wipeEnemiesToDeaths();
@@ -24,5 +25,6 @@ export function createBoss(tier, { kind, hp, value, extra }) {
     ...extra,
   };
   state.enemies.push(boss);
+  accrueMaxScore(value);
   return boss;
 }

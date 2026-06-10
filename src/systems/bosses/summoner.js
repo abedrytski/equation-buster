@@ -4,16 +4,17 @@
 
 import { state } from "../../core/state.js";
 import { W, playerY } from "../../core/view.js";
-import { TYPES, SUMMONER_MINIONS, SUMMONER_SPAWN_DELAY, TOP_SPAWN_Y } from "../../core/config.js";
+import { SUMMONER_MINIONS, SUMMONER_SPAWN_DELAY, TOP_SPAWN_Y } from "../../core/config.js";
+import { TYPES } from "../enemies/index.js";
 import { randInt } from "../../core/equations.js";
 import { sharedEq, spawnDeath } from "../entities.js";
 import { rebuildChips } from "../chips.js";
-import { gainScore } from "../waves.js";
+import { gainScore, accrueMaxScore } from "../waves.js";
 import { createBoss } from "./shared.js";
 
 function spawnSummon(parent) {
   const spec = TYPES.summon;
-  const eq = sharedEq(() => spec.eq(state.config.maxNum));
+  const eq = sharedEq(() => spec.eq(state.config.maxNum, state.config.additional_terms));
   // pick a random spot on the playfield, biased away from the boss
   let x = W / 2, y = playerY / 2;
   const minX = 40, maxX = W - 40;
@@ -37,6 +38,7 @@ function spawnSummon(parent) {
     spawnFade: 0,
     timeLeft: spec.lifetime,
   });
+  accrueMaxScore(spec.value);
   rebuildChips();
 }
 
@@ -94,6 +96,6 @@ export default {
   },
 
   label() {
-    return "✦ THE SUMMONER ✦";
+    return "✦ THE SUM MONER ✦";
   },
 };

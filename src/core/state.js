@@ -1,15 +1,23 @@
 // The single mutable game-state object, plus a factory for a fresh run.
 // Other modules import `state` and mutate it in place (never reassign it).
 
-import { DIFFICULTIES, MAX_LIVES } from "./config.js";
+import { MAX_LIVES, WAVES_PER_LEVEL } from "./config.js";
 
 // Per-game state, reset at the start of every run. Music fields live outside
 // this factory because they persist across games (mute pref + current track).
-export function freshGameState(diffKey) {
+export function freshGameState() {
   return {
     started: false,
-    diffKey: diffKey ?? null,
-    config: diffKey ? { ...DIFFICULTIES[diffKey] } : null,
+    menuScreen: "home",    // pre-game menu: "home" | "world"
+    currentWorld: 1,       // which world we're viewing on world selection screen
+    selectedWorld: 1,      // which world the active run belongs to
+    selectedLevel: 1,      // which level in the world was selected (default to 1)
+    config: null,          // set by startGame() based on world/level
+    bossLevel: false,      // true on the final level of a world (boss-only)
+    totalWaves: WAVES_PER_LEVEL, // waves to clear this level (1 for boss levels)
+    scoreMax: 0,           // theoretical max score for the level (for stars)
+    perfectKills: 0,       // hypothetical flawless-run kill counter (for scoreMax)
+    lastStars: 0,          // stars earned when the run ended in victory
     lives: MAX_LIVES,
     enemies: [],
     lasers: [],

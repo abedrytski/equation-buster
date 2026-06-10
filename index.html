@@ -47,29 +47,172 @@
 
     <div id="chipBar" hidden></div>
 
-    <div id="startScreen">
-      <h1>EQUATIONS BUSTER</h1>
-      <button id="startBtn" type="button">START</button>
-      <p id="diffHint">Or choose the difficulty:</p>
-      <div id="diffPicker">
-        <button class="diffBtn selected" data-diff="easy">EASY</button>
-        <button class="diffBtn" data-diff="medium">MEDIUM</button>
-        <button class="diffBtn" data-diff="hard">HARD</button>
+    <!-- ===== Home screen ===== -->
+    <div id="homeScreen" class="menuScreen" hidden>
+      <div class="homeDecor" aria-hidden="true">
+        <span class="decor" style="top:14%; left:64%; font-size:46px;">7</span>
+        <span class="decor" style="top:18%; left:18%; font-size:40px;">✕</span>
+        <span class="decor" style="top:26%; left:50%; font-size:30px;">✕</span>
+        <span class="decor" style="top:33%; left:74%; font-size:36px;">✕</span>
+        <span class="decor" style="top:38%; left:12%; font-size:44px;">9</span>
+        <span class="decor" style="top:39%; left:38%; font-size:40px;">3</span>
       </div>
+
+      <div class="homeTop">
+        <div class="profile">
+          <div class="avatar" id="profileAvatar">P</div>
+          <div class="profileText">
+            <span class="profileName" id="profileName">Player</span>
+            <span class="profileLevel" id="profileStars">0 ★</span>
+          </div>
+        </div>
+        <button id="settingsBtn" class="iconBtn" type="button" aria-label="settings">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+
+      <div class="homeBody">
+        <button id="worldCardBtn" class="worldCard" type="button">
+          <span class="worldKicker" id="homeWorldKicker">World 1</span>
+          <span class="worldName" id="homeWorldName">Number Jungle</span>
+          <div class="progressRow">
+            <div class="progressBar"><div class="progressFill" id="homeWorldFill" style="width:0%"></div></div>
+            <span class="progressText" id="homeWorldProgress">0/5</span>
+          </div>
+        </button>
+
+        <div class="statCards">
+          <div class="statCard">
+            <span class="statLabel">✦ Points</span>
+            <span class="statValue" id="homePoints">0</span>
+          </div>
+          <div class="statCard">
+            <span class="statLabel">★ Stars</span>
+            <span class="statValue gold" id="homeStars">0</span>
+            <span class="statSub" id="homeStarsSub">Keep going!</span>
+          </div>
+        </div>
+      </div>
+
+      <button id="homePlayBtn" class="bigPlayBtn" type="button">
+        <span class="playIcon">▶</span>
+        <span class="playLabel">
+          <span class="playMain">Play</span>
+          <span class="playSub" id="homePlaySub">Start · Level 1</span>
+        </span>
+      </button>
+    </div>
+
+    <!-- ===== World selection screen ===== -->
+    <div id="worldScreen" class="menuScreen" hidden>
+      <div class="worldHeader">
+        <button id="worldBackBtn" class="iconBtn back" type="button" aria-label="back">‹</button>
+        <div class="worldHeaderTitle">
+          <span class="worldKicker" id="worldHeaderKicker">World 1</span>
+          <span class="worldHeaderName" id="worldHeaderName">Number Jungle</span>
+        </div>
+        <div class="starBadge"><span class="starIcon">★</span> <span id="worldStarBadge">0</span></div>
+      </div>
+
+      <!-- World navigation -->
+      <div class="worldNav">
+        <button id="worldPrevBtn" class="worldNavBtn" type="button" aria-label="previous world">‹</button>
+        <span id="worldNavTitle" class="worldNavTitle">World 1</span>
+        <button id="worldNextBtn" class="worldNavBtn" type="button" aria-label="next world">›</button>
+      </div>
+      <div class="progressRow worldHeaderProgress">
+        <div class="progressBar"><div class="progressFill" id="worldProgressFill"></div></div>
+        <span class="progressText" id="worldProgressText">0/5 levels</span>
+      </div>
+
+      <div class="levelMap">
+        <svg class="levelMapSvg" width="100%" height="100%" style="position: absolute; inset: 0; pointer-events: none;"></svg>
+
+        <div class="levelNodeWrapper lane-center" data-level="5">
+          <div class="levelStars"><span class="star">★</span><span class="star">★</span><span class="star">★</span></div>
+          <button class="node boss" data-level="5" data-unlocked="false"><span class="nodeKicker">Boss</span></button>
+        </div>
+
+        <div class="levelNodeWrapper lane-right" data-level="4">
+          <div class="levelStars"><span class="star">★</span><span class="star">★</span><span class="star">★</span></div>
+          <button class="node" data-level="4" data-unlocked="false"><span class="nodeNum">4</span></button>
+        </div>
+
+        <div class="levelNodeWrapper lane-left" data-level="3">
+          <div class="levelStars"><span class="star">★</span><span class="star">★</span><span class="star">★</span></div>
+          <button class="node" data-level="3" data-unlocked="false"><span class="nodeNum">3</span></button>
+        </div>
+
+        <div class="levelNodeWrapper lane-right" data-level="2">
+          <div class="levelStars"><span class="star">★</span><span class="star">★</span><span class="star">★</span></div>
+          <button class="node" data-level="2" data-unlocked="false"><span class="nodeNum">2</span></button>
+        </div>
+
+        <div class="levelNodeWrapper lane-left" data-level="1">
+          <div class="levelStars"><span class="star">★</span><span class="star">★</span><span class="star">★</span></div>
+          <button class="node" data-level="1" data-unlocked="true"><span class="nodeNum">1</span></button>
+        </div>
+      </div>
+
+      <button id="worldPlayBtn" class="bigPlayBtn worldPlay" type="button">
+        <span class="playIcon">▶</span>
+        <span class="playLabel">
+          <span class="playMain">Play</span>
+          <span class="playSub" id="worldPlayLabel">Level 1</span>
+        </span>
+      </button>
     </div>
 
     <div id="gameover" hidden>
+      <div id="victoryStars" class="victoryStars" hidden>
+        <span class="vStar">★</span>
+        <span class="vStar mid">★</span>
+        <span class="vStar">★</span>
+      </div>
       <h1 id="gameoverTitle">Game Over</h1>
       <p id="finalScore"></p>
       <div class="goBtns">
         <button id="restartBtn">Play again</button>
-        <button id="changeDiffBtn">Change difficulty</button>
+        <button id="homeBtn">Home</button>
+      </div>
+    </div>
+
+    <!-- ===== Auth Screen ===== -->
+    <div id="authScreen" class="authScreen">
+      <div class="authContainer">
+        <h1 class="authTitle">EQUATIONS BUSTER</h1>
+
+        <!-- Login Form -->
+        <div id="loginForm" class="authForm">
+          <h2>Login</h2>
+          <input id="loginEmail" class="authInput" type="email" placeholder="Email" />
+          <input id="loginPassword" class="authInput" type="password" placeholder="Password" />
+          <button id="loginBtn" class="authBtn primary">Login</button>
+          <p class="authHint">Don't have an account? <a href="#" id="switchToSignup" class="authLink">Sign up</a></p>
+          <p id="loginError" class="authError" hidden></p>
+        </div>
+
+        <!-- Signup Form -->
+        <div id="signupForm" class="authForm" hidden>
+          <h2>Create Account</h2>
+          <input id="signupEmail" class="authInput" type="email" placeholder="Email" />
+          <input id="signupPassword" class="authInput" type="password" placeholder="Password (min 6 characters)" />
+          <input id="signupConfirm" class="authInput" type="password" placeholder="Confirm Password" />
+          <button id="signupBtn" class="authBtn primary">Sign Up</button>
+          <p class="authHint">Already have an account? <a href="#" id="switchToLogin" class="authLink">Login</a></p>
+          <p id="signupError" class="authError" hidden></p>
+        </div>
+
+        <!-- Demo/Test Button -->
+        <button id="testLoginBtn" class="authBtn secondary">Quick Test Login</button>
       </div>
     </div>
 
     </div>
     <audio id="bgm" src="./music/background.mp3" loop preload="auto"></audio>
     <audio id="bossBgm" src="./music/boss.mp3" loop preload="auto"></audio>
+    <!-- Supabase client library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module" src="./src/main.js"></script>
   </body>
 </html>

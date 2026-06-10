@@ -3,12 +3,13 @@
 
 import { state } from "../core/state.js";
 import { laneX, playerY } from "../core/view.js";
-import { maxEnemiesForWave } from "./waves.js";
+import { maxEnemiesForWave, accrueMaxScore } from "./waves.js";
 import { rebuildChips } from "./chips.js";
 import {
-  TYPES, SPAWN_TABLE, NUM_LANES, MAX_LIVES,
+  spawnTableFor, NUM_LANES, MAX_LIVES,
   TOP_SPAWN_Y, SPAWN_HEAD_CLEARANCE,
 } from "../core/config.js";
+import { TYPES } from "./enemies/index.js";
 
 // ---------- shared units digit
 
@@ -62,13 +63,14 @@ export function sharedEq(genFn, exclude, tries = 40) {
 
 // ---------- spawn-table sampling
 
-export function spawnTableForWave(wave) {
-  const i = Math.min(wave, SPAWN_TABLE.length) - 1;
-  return SPAWN_TABLE[Math.max(0, i)];
+// Enemy proportions for the level currently being played. Both waves of a level
+// share one plan (LEVEL_PLAN, keyed by world+level) — no longer per wave.
+export function currentSpawnTable() {
+  return spawnTableFor(state.selectedWorld, state.selectedLevel);
 }
 
-export function pickType(wave, maxValue, exclude) {
-  const t = spawnTableForWave(wave);
+export function pickType(maxValue, exclude) {
+  const t = currentSpawnTable();
   const usable = {};
   let total = 0;
   for (const k in t) {
@@ -150,7 +152,7 @@ export function spawnEnemy(maxValue) {
       (exclude ||= new Set()).add(k);
     }
   }
-  const type = pickType(state.wave, maxValue, exclude);
+  const type = pickType(maxValue, exclude);
   const spec = TYPES[type];
 
   let lane, x, y;
@@ -173,7 +175,7 @@ export function spawnEnemy(maxValue) {
 
   if (spec.bonus) state.bonusSpawnedThisWave[type] = (state.bonusSpawnedThisWave[type] || 0) + 1;
 
-  const eq = sharedEq(() => spec.eq(state.config.maxNum));
+  const eq = sharedEq(() => spec.eq(state.config.maxNum, state.config.additional_terms));
   const enemy = {
     type, x, y, lane,
     text: eq.text, answer: eq.answer,
@@ -187,6 +189,8 @@ export function spawnEnemy(maxValue) {
   };
   if (spec.lifetime) enemy.timeLeft = spec.lifetime;
   state.enemies.push(enemy);
+  // count this enemy toward the level's flawless-run max score (bonuses don't score)
+  if (spec.awardsScore !== false) accrueMaxScore(spec.value);
   rebuildChips();
   return spec.value;
 }

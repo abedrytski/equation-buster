@@ -5,29 +5,28 @@
 import { state } from "../core/state.js";
 import { laneX, playerX, playerY } from "../core/view.js";
 import {
-  TYPES, BREATHER_DURATION, MAX_WAVES, SPAWN_FADE_DURATION,
+  BREATHER_DURATION, SPAWN_FADE_DURATION,
   LANE_SEPARATION_GAP, LIFE_LOSS_WIPE_RADIUS,
 } from "../core/config.js";
+import { TYPES } from "./enemies/index.js";
 import {
   isBossWave, waveValueBudget, maxEnemiesForWave,
   spawnIntervalForWave, waveSpeedFactor, announceWave,
 } from "./waves.js";
 import { spawnEnemy, spawnDeath } from "./entities.js";
-import { getBossDef, pickBossForWave } from "./bosses/index.js";
-import { endGame } from "./combat.js";
+import { getBossDef } from "./bosses/index.js";
+import { winLevel, endGame } from "./combat.js";
 import { rebuildChips } from "./chips.js";
 
 export function advanceWave() {
+  // regular levels only ever step between non-boss waves; the boss level spawns
+  // its boss up front in startGame, so there's no in-run boss spawn here.
   state.wave += 1;
   state.wavePhase = "active";
   state.waveTimer = 0;
   state.waveValueRemaining = waveValueBudget(state.wave);
   state.bonusSpawnedThisWave = {};
   announceWave();
-  if (isBossWave(state.wave)) {
-    state.bossesSpawned += 1;
-    pickBossForWave(state.bossesSpawned).spawn(state.bossesSpawned);
-  }
 }
 
 export function update(dt) {
@@ -37,15 +36,15 @@ export function update(dt) {
   if (frozen) state.freezeTimer = Math.max(0, state.freezeTimer - dt);
 
   const bossAlive = state.enemies.some((e) => e.type === "boss");
-  const stillSpawning = state.waveValueRemaining > 0 && !isBossWave(state.wave);
+  const stillSpawning = state.waveValueRemaining > 0 && !isBossWave();
   const waveCleared = !stillSpawning && state.enemies.length === 0;
 
   // wave phase machine (breather is allowed to tick during freeze so the freeze
   // doesn't stretch the inter-wave gap; new active-phase spawns are gated below)
   if (state.wavePhase === "active" && waveCleared) {
-    if (state.wave >= MAX_WAVES) {
-      // run complete — show the score screen instead of advancing
-      endGame("You've done it!", true);
+    if (state.wave >= state.totalWaves) {
+      // level complete — show the score screen instead of advancing
+      winLevel();
     } else {
       state.wavePhase = "breather";
       state.waveTimer = BREATHER_DURATION;
