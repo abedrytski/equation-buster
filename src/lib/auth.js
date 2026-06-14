@@ -29,23 +29,13 @@ let authListeners = [];
 export async function initAuth() {
   try {
     const sb = await getSupabase();
-    const { data, error } = await sb.auth.getSession();
-    if (error) throw error;
-    if (data?.session) {
-      currentUser = data.session.user;
-      notifyListeners({ type: "restore", user: currentUser });
-    }
-  } catch (err) {
-    console.error("Failed to restore session:", err.message);
-  }
-
-  try {
-    const sb = await getSupabase();
-    const { data: listener } = sb.auth.onAuthStateChange((event, session) => {
+    // onAuthStateChange fires INITIAL_SESSION on subscription with the current
+    // auth state — no separate getSession() call needed, no race condition.
+    const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
       currentUser = session?.user ?? null;
       notifyListeners({ type: event, user: currentUser });
     });
-    return listener;
+    return subscription;
   } catch (err) {
     console.error("Failed to setup auth listener:", err.message);
   }

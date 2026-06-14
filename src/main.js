@@ -6,7 +6,7 @@ import { state } from "./core/state.js";
 import { MAX_INPUT_LEN, NUM_WORLDS } from "./core/config.js";
 import * as auth from "./lib/auth.js";
 import * as progress from "./lib/progress.js";
-import { initAuthUI, hideAuthScreen, showAuthScreen } from "./lib/authUI.js";
+import { initAuthUI, hideAuthScreen } from "./lib/authUI.js";
 import {
   restartBtnEl, homeBtnEl, homePlayBtnEl,
   worldCardBtnEl, worldBackBtnEl, worldPlayBtnEl, levelMapEl,
@@ -39,22 +39,18 @@ async function onSignedIn(user) {
   state.menuScreen = "home";  // reveal home screen only once data is ready
 }
 
-// Subscribe before initAuth so the OAuth-redirect case (where Supabase fires
-// SIGNED_IN via onAuthStateChange after the page reloads with ?code=...) is
-// always caught, even if getSession() returned null before the exchange.
+// INITIAL_SESSION fires once on subscription with the definitive auth state
+// (restored session or null). SIGNED_IN covers the OAuth-redirect return.
 auth.onAuthChange(({ type, user }) => {
-  if ((type === "SIGNED_IN" || type === "restore") && user) onSignedIn(user);
-});
-
-auth.initAuth().then(() => {
-  if (!auth.isAuthenticated()) {
-    // Either a fresh visit or OAuth exchange still in progress — show the sign-in
-    // screen. If it's the latter, onAuthChange above fires shortly after and
-    // dismisses it.
+  if (user && (type === "INITIAL_SESSION" || type === "SIGNED_IN")) {
+    onSignedIn(user);
+  } else if (!user && type === "INITIAL_SESSION") {
     initAuthUI();
     showAuthScreen();
   }
 });
+
+auth.initAuth();
 
 // ---------- main loop
 
