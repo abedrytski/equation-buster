@@ -75,3 +75,7 @@ CREATE POLICY "Users can update their own level progress"
 -- Indexes for performance
 CREATE INDEX idx_level_progress_user ON level_progress(user_id);
 CREATE INDEX idx_level_progress_world ON level_progress(user_id, world);
+
+-- Explicit grants required on cloud Supabase (auto_expose_new_tables defaults to false)
+GRANT SELECT, INSERT, UPDATE ON profiles TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON level_progress TO authenticated;
