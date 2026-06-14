@@ -6,7 +6,7 @@ import { state } from "./core/state.js";
 import { MAX_INPUT_LEN, NUM_WORLDS } from "./core/config.js";
 import * as auth from "./lib/auth.js";
 import * as progress from "./lib/progress.js";
-import { initAuthUI, hideAuthScreen } from "./lib/authUI.js";
+import { initAuthUI, hideAuthScreen, showAuthScreen } from "./lib/authUI.js";
 import {
   restartBtnEl, homeBtnEl, homePlayBtnEl,
   worldCardBtnEl, worldBackBtnEl, worldPlayBtnEl, levelMapEl,
