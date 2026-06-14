@@ -1,0 +1,9 @@
+{
+  "tasks": {
+    "serve": "deno run -A serve.ts"
+  },
+  "exclude": [
+    "src/",
+    "test-game.js"
+  ]
+}

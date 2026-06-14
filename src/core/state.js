@@ -49,6 +49,7 @@ export function freshGameState() {
 
 export const state = {
   ...freshGameState(null),
+  menuScreen: null,          // null = loading (auth+progress not ready yet)
   musicCurrentTrack: "none",
   musicMuted: false,
 };

@@ -21,7 +21,6 @@ export function initAuthUI() {
       googleSignInBtnEl.textContent = "Sign in with Google";
     }
   });
-  showAuthScreen();
 }
 
 export function showAuthScreen() {

@@ -36,6 +36,7 @@ async function onSignedIn(user) {
   const f = progress.getFurthest();
   state.currentWorld = f.world;
   state.selectedLevel = f.level;
+  state.menuScreen = "home";  // reveal home screen only once data is ready
 }
 
 // Subscribe before initAuth so the OAuth-redirect case (where Supabase fires
