@@ -6,7 +6,7 @@ import { state } from "./core/state.js";
 import { MAX_INPUT_LEN, NUM_WORLDS } from "./core/config.js";
 import * as auth from "./lib/auth.js";
 import * as progress from "./lib/progress.js";
-import { initAuthUI, hideAuthScreen } from "./lib/authUI.js";
+import { initAuthUI, hideAuthScreen, showAuthScreen } from "./lib/authUI.js";
 import {
   restartBtnEl, homeBtnEl, homePlayBtnEl,
   worldCardBtnEl, worldBackBtnEl, worldPlayBtnEl, levelMapEl,
@@ -25,9 +25,12 @@ initChipDOM();
 initAudio();
 
 // Once a user is signed in: load their saved progress, point the menus at the
-// furthest reached level, and reveal the game.
+// furthest reached level, and reveal the game. Guarded against double-fire
+// because both the immediate-restore and the OAuth-redirect paths can trigger.
+let _signedInOnce = false;
 async function onSignedIn(user) {
-  console.log("Signed in:", user.email);
+  if (_signedInOnce) return;
+  _signedInOnce = true;
   hideAuthScreen();
   await progress.initProgress();
   const f = progress.getFurthest();
@@ -35,12 +38,20 @@ async function onSignedIn(user) {
   state.selectedLevel = f.level;
 }
 
-// Initialize authentication
+// Subscribe before initAuth so the OAuth-redirect case (where Supabase fires
+// SIGNED_IN via onAuthStateChange after the page reloads with ?code=...) is
+// always caught, even if getSession() returned null before the exchange.
+auth.onAuthChange(({ type, user }) => {
+  if ((type === "SIGNED_IN" || type === "restore") && user) onSignedIn(user);
+});
+
 auth.initAuth().then(() => {
-  if (auth.isAuthenticated()) {
-    onSignedIn(auth.getCurrentUser());
-  } else {
-    initAuthUI(onSignedIn);
+  if (!auth.isAuthenticated()) {
+    // Either a fresh visit or OAuth exchange still in progress — show the sign-in
+    // screen. If it's the latter, onAuthChange above fires shortly after and
+    // dismisses it.
+    initAuthUI();
+    showAuthScreen();
   }
 });
 

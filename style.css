@@ -901,7 +901,15 @@ body {
   color: #67e8f9;
   letter-spacing: 4px;
   text-shadow: 0 0 32px rgba(103, 232, 249, 0.6);
-  margin-bottom: 12px;
+  margin-bottom: 4px;
+}
+
+.authSubtitle {
+  font-size: 13px;
+  color: #64748b;
+  letter-spacing: 1px;
+  margin: 0 0 16px;
+  text-align: center;
 }
 
 .authForm {
@@ -968,16 +976,21 @@ body {
   background: linear-gradient(180deg, #22d3ee, #06b6d4);
 }
 
-.authBtn.secondary {
-  background: #1e293b;
-  border: 1px solid #334155;
-  color: #cbd5e1;
-  font-size: 13px;
+.authBtn.google {
+  background: #fff;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  font-size: 15px;
+  letter-spacing: 1px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
 }
 
-.authBtn.secondary:hover {
-  background: #334155;
-}
+.authBtn.google:hover { background: #f1f5f9; }
+.authBtn.google:disabled { opacity: 0.6; cursor: default; }
 
 .authHint {
   font-size: 13px;
