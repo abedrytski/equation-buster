@@ -33,6 +33,7 @@ export async function initAuth() {
     // auth state — no separate getSession() call needed, no race condition.
     const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
       currentUser = session?.user ?? null;
+      console.log("[auth] onAuthStateChange", event, currentUser?.email ?? null);
       notifyListeners({ type: event, user: currentUser });
     });
     return subscription;

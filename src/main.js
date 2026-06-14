@@ -42,9 +42,11 @@ async function onSignedIn(user) {
 // INITIAL_SESSION fires once on subscription with the definitive auth state
 // (restored session or null). SIGNED_IN covers the OAuth-redirect return.
 auth.onAuthChange(({ type, user }) => {
+  console.log("[main] onAuthChange", type, user?.email ?? null);
   if (user && (type === "INITIAL_SESSION" || type === "SIGNED_IN")) {
     onSignedIn(user);
   } else if (!user && type === "INITIAL_SESSION") {
+    console.log("[main] no session → showing auth screen");
     initAuthUI();
     showAuthScreen();
   }

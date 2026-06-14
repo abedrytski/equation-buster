@@ -24,9 +24,11 @@ export function initAuthUI() {
 }
 
 export function showAuthScreen() {
+  console.log("[authUI] showAuthScreen called", new Error().stack);
   authScreenEl.hidden = false;
 }
 
 export function hideAuthScreen() {
+  console.log("[authUI] hideAuthScreen called");
   authScreenEl.hidden = true;
 }
