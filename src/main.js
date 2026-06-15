@@ -31,12 +31,12 @@ let _signedInOnce = false;
 async function onSignedIn(user) {
   if (_signedInOnce) return;
   _signedInOnce = true;
-  hideAuthScreen();
   await progress.initProgress();
   const f = progress.getFurthest();
   state.currentWorld = f.world;
   state.selectedLevel = f.level;
-  state.menuScreen = "home";  // reveal home screen only once data is ready
+  state.menuScreen = "home";
+  hideAuthScreen();  // reveal only after home screen data is ready
 }
 
 // INITIAL_SESSION fires once on subscription with the definitive auth state
