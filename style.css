@@ -886,6 +886,7 @@ body {
 }
 
 #authScreen[hidden] { display: none; }
+#authScreen[data-loading] .authContainer { display: none; }
 
 .authContainer {
   width: 100%;
