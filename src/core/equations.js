@@ -58,3 +58,20 @@ export function mkAddN(count, eachMax) {
   for (let i = 0; i < count; i++) nums.push(randInt(1, eachMax));
   return { text: nums.join("+"), answer: nums.reduce((s, n) => s + n, 0) };
 }
+
+// N-operand addition with a per-operand floor (unlike mkAddN which starts at 1).
+export function mkAddNFloor(count, lo, hi) {
+  const nums = [];
+  for (let i = 0; i < count; i++) nums.push(randInt(lo, hi));
+  return { text: nums.join("+"), answer: nums.reduce((s, n) => s + n, 0) };
+}
+
+// Subtraction with a guaranteed minimum answer (aFloor).
+// aFloor ≥ 2 required; aMax must be > aFloor.
+export function mkSubFloor(aMax, aFloor) {
+  const lo = Math.max(2, aFloor);
+  const hi = Math.max(lo + 1, aMax);
+  const a = randInt(lo + 1, hi);
+  const b = randInt(1, a - lo);
+  return { text: `${a}-${b}`, answer: a - b };
+}

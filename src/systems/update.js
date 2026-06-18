@@ -6,14 +6,14 @@ import { state } from "../core/state.js";
 import { laneX, playerX, playerY } from "../core/view.js";
 import {
   BREATHER_DURATION, SPAWN_FADE_DURATION,
-  LANE_SEPARATION_GAP, LIFE_LOSS_WIPE_RADIUS,
+  LANE_SEPARATION_GAP, SHIELD_REGEN_TIME,
 } from "../core/config.js";
 import { TYPES } from "./enemies/index.js";
 import {
   isBossWave, waveValueBudget, maxEnemiesForWave,
   spawnIntervalForWave, waveSpeedFactor, announceWave,
 } from "./waves.js";
-import { spawnEnemy, spawnDeath } from "./entities.js";
+import { spawnEnemy } from "./entities.js";
 import { getBossDef } from "./bosses/index.js";
 import { winLevel, endGame } from "./combat.js";
 import { rebuildChips } from "./chips.js";
@@ -75,6 +75,10 @@ export function update(dt) {
     state.deaths[i].life -= dt;
     if (state.deaths[i].life <= 0) state.deaths.splice(i, 1);
   }
+  for (let i = state.damageNums.length - 1; i >= 0; i--) {
+    state.damageNums[i].life -= dt;
+    if (state.damageNums[i].life <= 0) state.damageNums.splice(i, 1);
+  }
 
   // per-frame boss-level behavior (each boss def decides: Summoner tops up its
   // minions, Mirror checks its enrage threshold, …)
@@ -92,6 +96,12 @@ export function update(dt) {
 
     if (e.spawnFade != null && e.spawnFade < 1) {
       e.spawnFade = Math.min(1, e.spawnFade + dt / SPAWN_FADE_DURATION);
+    }
+
+    // Shield regeneration for blue-type enemies.
+    if (spec.hasShield && !e.shielded) {
+      e.shieldRegenTimer += dt;
+      if (e.shieldRegenTimer >= SHIELD_REGEN_TIME) e.shielded = true;
     }
 
     if (spec.lifetime) {
@@ -138,24 +148,13 @@ export function update(dt) {
             if (state.enemies[j].parent === e) state.enemies.splice(j, 1);
           }
         }
-        // a boss crossing the danger line is an instant kill
-        state.lives = e.type === "boss" ? 0 : state.lives - 1;
+        const isBoss = e.type === "boss";
+        state.hp = isBoss ? 0 : Math.max(0, state.hp - (e.damage || 1));
         state.streak = 0;
-        state.flashTimer = e.type === "boss" ? 0.6 : 0.4;
-        state.shakeTimer = e.type === "boss" ? 0.6 : 0.4;
+        state.flashTimer = isBoss ? 0.6 : 0.35;
+        state.shakeTimer = isBoss ? 0.6 : 0.35;
 
-        // wipe nearby enemies (no score) to give the player breathing room
-        const r2 = LIFE_LOSS_WIPE_RADIUS * LIFE_LOSS_WIPE_RADIUS;
-        for (let j = state.enemies.length - 1; j >= 0; j--) {
-          const ne = state.enemies[j];
-          const ddx = ne.x - playerX, ddy = ne.y - playerY;
-          if (ddx * ddx + ddy * ddy <= r2) {
-            spawnDeath(ne);
-            state.enemies.splice(j, 1);
-          }
-        }
-
-        if (state.lives <= 0) {
+        if (state.hp <= 0) {
           endGame("Game Over", false);
         }
         rebuildChips();

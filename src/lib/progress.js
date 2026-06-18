@@ -2,7 +2,10 @@
 // unlock/current/total state the menus read. Backed by Supabase via db.js and
 // keyed to the signed-in user from auth.js.
 
-import { LEVELS_PER_WORLD, NUM_WORLDS } from "../core/config.js";
+import {
+  LEVELS_PER_WORLD, NUM_WORLDS,
+  xpProgressInLevel, MAX_PLAYER_LEVEL,
+} from "../core/config.js";
 import { getCurrentUser } from "./auth.js";
 import * as db from "./db.js";
 
@@ -10,6 +13,7 @@ let userId = null;
 // key "world:level" -> { stars, score, completed }
 const cache = new Map();
 let totalPoints = 0;
+let totalXP = 0;  // loaded from profile, not derived from stars
 let ready = false;
 
 const key = (w, l) => `${w}:${l}`;
@@ -20,7 +24,8 @@ export async function initProgress() {
   if (!user) return;
   userId = user.id;
 
-  await db.getOrCreateUser(userId);
+  const profile = await db.getOrCreateUser(userId);
+  totalXP = profile?.total_xp ?? 0;
   const rows = await db.getAllProgress(userId);
 
   cache.clear();
@@ -30,20 +35,22 @@ export async function initProgress() {
 }
 
 function recomputeTotals() {
-  let sum = 0;
-  for (const r of cache.values()) sum += r.score || 0;
-  totalPoints = sum;
+  let pts = 0;
+  for (const r of cache.values()) pts += r.score || 0;
+  totalPoints = pts;
+  // totalXP is managed separately (loaded from profile, updated on win)
 }
 
-// Persist a level win, raising the cached best result and totals.
-export async function recordLevelWin(world, level, score, stars) {
+// Persist a level win. xpEarned is computed by the caller (stars × diff scale).
+export async function recordLevelWin(world, level, score, stars, xpEarned = 0) {
   if (!userId) return;
   const saved = await db.saveLevelProgress(userId, world, level, stars, score);
   if (saved) cache.set(key(world, level), saved);
   recomputeTotals();
-  // keep the profile's headline number in sync (no ranking, just the total)
+  totalXP += xpEarned;
   db.updateUserProfile(userId, {
     total_points: totalPoints,
+    total_xp: totalXP,
     current_world: getFurthest().world,
   });
 }
@@ -68,13 +75,25 @@ export function isCompleted(world, level) {
   return !!(r && r.completed);
 }
 
-// A level is unlocked if it's the very first level, the previous level in the
-// same world is done, or it's the first level of a world whose predecessor is
-// fully cleared.
-export function isUnlocked(world, level) {
+// Global star requirement to unlock a given level.
+// Uses absolute level index: (world-1)*5 + level - 1, times 2.
+// W1L1=0, W1L2=2, W1L5=8, W2L1=10, W2L2=12 …
+export function starRequirement(world, level) {
+  const abs = (world - 1) * LEVELS_PER_WORLD + level - 1;
+  return abs * 2;
+}
+
+// Whether the previous level in the sequence has been cleared (path is open).
+export function isPathAccessible(world, level) {
   if (world === 1 && level === 1) return true;
-  if (level > 1) return isCompleted(world, level - 1);
-  return isCompleted(world - 1, LEVELS_PER_WORLD);
+  if (level === 1) return isCompleted(world - 1, LEVELS_PER_WORLD);
+  return isCompleted(world, level - 1);
+}
+
+// Fully unlocked = path accessible AND star threshold met (or already beaten).
+export function isUnlocked(world, level) {
+  if (isCompleted(world, level)) return true;
+  return isPathAccessible(world, level) && getTotalStars() >= starRequirement(world, level);
 }
 
 // Count of completed levels in a world (for the world progress bar).
@@ -95,6 +114,15 @@ export function getTotalPoints() {
   return totalPoints;
 }
 
+export function getTotalXP() {
+  return totalXP;
+}
+
+// 0-based internal level; display as (playerLevel + 1)
+export function getPlayerLevel() {
+  return xpProgressInLevel(totalXP).level;
+}
+
 export function getTotalStars() {
   let n = 0;
   for (const r of cache.values()) n += r.stars || 0;
@@ -111,6 +139,17 @@ export function defaultLevel(world) {
     if (!isCompleted(world, l)) return l;
   }
   return highestUnlocked;
+}
+
+// XP eligibility: only the frontier level and the one directly below it give
+// full XP. Anything further back gives nothing.
+export function replayXpInfo(world, level) {
+  const frontier = getFurthest();
+  const playedAbs   = (world - 1) * LEVELS_PER_WORLD + level;
+  const frontierAbs = (frontier.world - 1) * LEVELS_PER_WORLD + frontier.level;
+  const dist  = Math.max(0, frontierAbs - playedAbs);
+  const scale = dist <= 1 ? 1 : 0;
+  return { dist, scale };
 }
 
 // The furthest reached (first uncompleted unlocked) level — drives "Continue".

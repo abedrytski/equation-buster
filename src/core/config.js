@@ -4,7 +4,11 @@
 
 // ---------- core tunables
 
-export const MAX_LIVES = 3;
+export const MAX_HP = 10;
+export const PLAYER_DAMAGE_MIN = 13;
+export const PLAYER_DAMAGE_MAX = 15;
+export const HEART_HEAL = 3;
+export const SHIELD_REGEN_TIME = 4;
 export const MAX_INPUT_LEN = 4;
 export const MAX_CHIPS = 6;
 // Hard ceiling on simultaneous on-screen enemies, across all difficulties.
@@ -38,7 +42,7 @@ export const BOSS_EVERY_N_WAVES = 3;
 // short waves; the final level of a world is a single boss fight (no waves).
 export const LEVELS_PER_WORLD = 5;
 export const WAVES_PER_LEVEL = 2;
-export const NUM_WORLDS = 10;
+export const NUM_WORLDS = 5;
 
 // Display names per world (index 0 unused; worlds are 1-based).
 export const WORLD_NAMES = [
@@ -48,11 +52,6 @@ export const WORLD_NAMES = [
   "Times-Table Valley",
   "Division Desert",
   "Fraction Falls",
-  "Decimal Depths",
-  "Power Plateau",
-  "Algebra Abyss",
-  "Geometry Gardens",
-  "Infinity Isles",
 ];
 
 // streak tiers: [minCount, multiplier, cssTier]
@@ -72,13 +71,15 @@ export const MAX_STREAK_MULT = STREAK_TIERS[STREAK_TIERS.length - 1].mult;
 // Replaces the old per-wave SPAWN_TABLE — levels are only WAVES_PER_LEVEL waves
 // now, and both waves of a level share one plan.
 //
-//   lp(maxNum, additional_terms, spawn)
+//   lp(maxNum, additional_terms, hp_mult, spawn)
 //     maxNum           — difficulty axis 1: ceiling for equation operands.
 //                        Bigger = larger numbers, harder arithmetic.
 //     additional_terms — difficulty axis 2: extra operands added to every
 //                        enemy's equation beyond its base count (0 = normal).
 //                        0 everywhere today; set to 1 to turn "a+b" into
 //                        "a+b+c", 2 for "a+b+c+d", etc.
+//     hp_mult          — multiplier applied to each spawned enemy's base HP
+//                        (rounded up). 1.0 = base. Increases with world/level.
 //     spawn  — enemy proportions (weights), same shape as a row of the old
 //              SPAWN_TABLE. Bonus types (ice/heart) are still gated at spawn
 //              time. Empty {} for the boss level (level LEVELS_PER_WORLD), which
@@ -86,91 +87,51 @@ export const MAX_STREAK_MULT = STREAK_TIERS[STREAK_TIERS.length - 1].mult;
 //
 // To add an enemy: give it a file under systems/enemies/, then add its id with
 // a weight to the cells where it should appear.
-function lp(maxNum, additional_terms, spawn) {
-  return { maxNum, additional_terms, spawn };
+function lp(maxNum, additional_terms, hp_mult, spawn) {
+  return { maxNum, additional_terms, hp_mult, spawn };
 }
 
 export const LEVEL_PLAN = {
   // World 1 — Number Jungle: introduces the roster one enemy at a time.
   1: {
-    1: lp(10, 0, { yellow: 4, ice: 1 }),
-    2: lp(12, 0, { yellow: 4, pink: 2, ice: 1, heart: 1 }),
-    3: lp(15, 0, { yellow: 3, pink: 3, green: 2, ice: 1, heart: 1 }),
-    4: lp(18, 0, { yellow: 3, pink: 3, green: 2, blue: 2, ice: 1, heart: 1 }),
-    5: lp(20, 0, {}),
+    1: lp(10, 0, 1.0, { yellow: 4, ice: 1 }),
+    2: lp(12, 0, 1.15, { yellow: 4, pink: 2, ice: 1, heart: 2 }),
+    3: lp(15, 0, 1.3, { yellow: 3, pink: 3, ice: 1, heart: 2 }),
+    4: lp(18, 0, 1.45, { yellow: 2, pink: 4, ice: 1, heart: 2 }),
+    5: lp(20, 0, 1.6, {}),
   },
   // World 2 — Adder's Peak: full roster online, hexagon brute appears.
   2: {
-    1: lp(18, 0, { yellow: 3, pink: 3, green: 2, ice: 1 }),
-    2: lp(20, 0, { yellow: 2, pink: 3, green: 2, blue: 2, ice: 1, heart: 1 }),
-    3: lp(22, 0, { yellow: 2, pink: 3, green: 3, blue: 2, hexagon: 1, ice: 1, heart: 1 }),
-    4: lp(25, 0, { yellow: 2, pink: 2, green: 3, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
-    5: lp(28, 0, {}),
+    1: lp(18, 0, 1.75, { yellow: 3, pink: 3, green: 1, ice: 1 }),
+    2: lp(20, 0, 1.9, { yellow: 2, pink: 3, green: 2, blue: 2, ice: 1, heart: 2 }),
+    3: lp(22, 0, 2.1, { yellow: 2, pink: 3, green: 3, blue: 2, ice: 1, heart: 2 }),
+    4: lp(25, 0, 2.25, { yellow: 2, pink: 2, green: 4, blue: 4, ice: 1, heart: 2 }),
+    5: lp(28, 0, 2.4, {}),
   },
   // World 3 — Times-Table Valley
   3: {
-    1: lp(25, 0, { yellow: 2, pink: 3, green: 2, blue: 2, hexagon: 1, ice: 1, heart: 1 }),
-    2: lp(28, 0, { yellow: 2, pink: 2, green: 3, blue: 2, hexagon: 1, ice: 1, heart: 1 }),
-    3: lp(30, 0, { yellow: 1, pink: 2, green: 3, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
-    4: lp(33, 0, { yellow: 1, pink: 2, green: 2, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
-    5: lp(36, 0, {}),
+    1: lp(25, 0, 2.5, { yellow: 2, pink: 3, green: 2, blue: 2, hexagon: 1, ice: 1, heart: 1 }),
+    2: lp(28, 0, 2.65, { yellow: 2, pink: 2, green: 3, blue: 2, hexagon: 1, ice: 1, heart: 1 }),
+    3: lp(30, 0, 2.8, { yellow: 1, pink: 2, green: 3, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
+    4: lp(33, 0, 3.0, { yellow: 1, pink: 2, green: 2, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
+    5: lp(36, 0, 3.15, {}),
   },
   // World 4 — Division Desert
   4: {
-    1: lp(33, 0, { yellow: 1, pink: 3, green: 2, blue: 2, hexagon: 1, ice: 1, heart: 1 }),
-    2: lp(36, 0, { yellow: 1, pink: 2, green: 3, blue: 2, hexagon: 2, ice: 1, heart: 1 }),
-    3: lp(40, 0, { pink: 2, green: 3, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
-    4: lp(44, 0, { pink: 2, green: 2, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
-    5: lp(48, 0, {}),
+    1: lp(33, 0, 3.2, { yellow: 1, pink: 3, green: 2, blue: 2, hexagon: 1, ice: 1, heart: 1 }),
+    2: lp(36, 0, 3.4, { yellow: 1, pink: 2, green: 3, blue: 2, hexagon: 2, ice: 1, heart: 1 }),
+    3: lp(40, 0, 3.55, { pink: 2, green: 3, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
+    4: lp(44, 0, 3.7, { pink: 2, green: 2, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
+    5: lp(48, 0, 3.85, {}),
   },
   // World 5 — Fraction Falls
   5: {
-    1: lp(45, 0, { pink: 3, green: 2, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
-    2: lp(50, 0, { pink: 2, green: 3, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
-    3: lp(55, 0, { pink: 2, green: 3, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
-    4: lp(60, 0, { pink: 2, green: 2, blue: 4, hexagon: 3, ice: 1, heart: 1 }),
-    5: lp(65, 0, {}),
-  },
-  // World 6 — Decimal Depths
-  6: {
-    1: lp(60, 0, { pink: 3, green: 2, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
-    2: lp(66, 0, { pink: 2, green: 3, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
-    3: lp(72, 0, { pink: 2, green: 2, blue: 4, hexagon: 3, ice: 1, heart: 1 }),
-    4: lp(78, 0, { pink: 1, green: 2, blue: 4, hexagon: 4, ice: 1, heart: 1 }),
-    5: lp(85, 0, {}),
-  },
-  // World 7 — Power Plateau
-  7: {
-    1: lp(80, 0, { pink: 3, green: 3, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
-    2: lp(88, 0, { pink: 2, green: 3, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
-    3: lp(95, 0, { pink: 2, green: 2, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
-    4: lp(103, 0, { pink: 1, green: 2, blue: 3, hexagon: 4, ice: 1, heart: 1 }),
-    5: lp(110, 0, {}),
-  },
-  // World 8 — Algebra Abyss
-  8: {
-    1: lp(100, 0, { pink: 2, green: 3, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
-    2: lp(110, 0, { pink: 2, green: 2, blue: 4, hexagon: 3, ice: 1, heart: 1 }),
-    3: lp(120, 0, { pink: 1, green: 2, blue: 4, hexagon: 4, ice: 1, heart: 1 }),
-    4: lp(130, 0, { pink: 1, green: 2, blue: 3, hexagon: 5, ice: 1, heart: 1 }),
-    5: lp(140, 0, {}),
-  },
-  // World 9 — Geometry Gardens
-  9: {
-    1: lp(130, 0, { pink: 2, green: 2, blue: 4, hexagon: 3, ice: 1, heart: 1 }),
-    2: lp(142, 0, { pink: 1, green: 2, blue: 4, hexagon: 4, ice: 1, heart: 1 }),
-    3: lp(155, 0, { pink: 1, green: 2, blue: 3, hexagon: 5, ice: 1, heart: 1 }),
-    4: lp(168, 0, { green: 2, blue: 3, hexagon: 5, ice: 1, heart: 1 }),
-    5: lp(180, 0, {}),
-  },
-  // World 10 — Infinity Isles: the gauntlet, hexagon-heavy.
-  10: {
-    1: lp(170, 0, { pink: 1, green: 2, blue: 4, hexagon: 4, ice: 1, heart: 1 }),
-    2: lp(185, 0, { green: 2, blue: 4, hexagon: 4, ice: 1, heart: 1 }),
-    3: lp(200, 0, { green: 2, blue: 3, hexagon: 5, ice: 1, heart: 1 }),
-    4: lp(215, 0, { green: 1, blue: 3, hexagon: 6, ice: 1, heart: 1 }),
-    5: lp(230, 0, {}),
-  },
+    1: lp(45, 0, 3.9, { pink: 3, green: 2, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
+    2: lp(50, 0, 4.05, { pink: 2, green: 3, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
+    3: lp(55, 0, 4.2, { pink: 2, green: 3, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
+    4: lp(60, 0, 4.35, { pink: 2, green: 2, blue: 4, hexagon: 3, ice: 1, heart: 1 }),
+    5: lp(65, 0, 4.5, {}),
+  }
 };
 
 // Look up a level's plan, clamping out-of-range world/level to the last defined.
@@ -192,7 +153,7 @@ export function spawnTableFor(world, level) {
 const BASE_DIFFICULTY = {
   enemyCapAdd: 2,
   enemyCapMax: 4,
-  speedMult: 0.50,
+  speedMult: 0.30,
   spawnBase: 1.8,
   spawnDecay: 0.94,
   spawnMin: 1.0,
@@ -201,18 +162,21 @@ const BASE_DIFFICULTY = {
 // Build the full runtime difficulty config for a world/level: math knobs straight
 // from LEVEL_PLAN, pacing knobs scaled logarithmically with absolute level
 // (5 levels per world, log base 1.5 for smooth exponential growth).
-export function difficultyForWorldLevel(world, level) {
+// diffMult is the global challenge multiplier (1 = default).
+// Scales maxNum (equations), hp_mult (enemy HP), and speedMult.
+export function difficultyForWorldLevel(world, level, diffMult = 1) {
   const plan = levelPlan(world, level);
   const absoluteLevel = (world - 1) * LEVELS_PER_WORLD + level;
   // log_1.5(x) ≈ ln(x) / ln(1.5)
   const scalar = Math.log(Math.max(1, absoluteLevel)) / Math.log(1.5);
 
   return {
-    maxNum: plan.maxNum,
+    maxNum: Math.round(plan.maxNum * diffMult),
     additional_terms: plan.additional_terms,
+    hp_mult: plan.hp_mult * diffMult,
     enemyCapAdd: Math.round(BASE_DIFFICULTY.enemyCapAdd * (0.7 + scalar * 0.5)),
     enemyCapMax: Math.round(BASE_DIFFICULTY.enemyCapMax * (0.7 + scalar * 0.5)),
-    speedMult: BASE_DIFFICULTY.speedMult * (0.8 + scalar * 0.3),
+    speedMult: BASE_DIFFICULTY.speedMult * (0.8 + scalar * 0.3) * (1 + (diffMult - 1) * 0.5),
     spawnBase: BASE_DIFFICULTY.spawnBase * Math.pow(0.94, scalar * 0.5),
     spawnDecay: BASE_DIFFICULTY.spawnDecay - scalar * 0.01,
     spawnMin: Math.max(0.1, BASE_DIFFICULTY.spawnMin - scalar * 0.05),
@@ -246,3 +210,36 @@ export const SPAWN_FADE_DURATION = 0.45;  // seconds for newly spawned enemies t
 
 export const MUSIC_BG_VOL = 0.45;
 export const MUSIC_BOSS_VOL = 0.55;
+
+// ---------- player progression (XP / level)
+
+// Base XP per star at 1× difficulty. Scaled by difficulty in settings.js.
+export const XP_BASE_STARS = [0, 25, 50, 100];
+// XP needed for level 1. Each subsequent level costs ×XP_LEVEL_GROWTH more.
+export const XP_BASE_THRESHOLD = 250;
+export const XP_LEVEL_GROWTH = 1.3;
+export const MAX_PLAYER_LEVEL = 30;
+
+// Returns { level, xpIn, threshold } from accumulated XP.
+// threshold = XP needed to reach the NEXT level (0 when at max).
+export function xpProgressInLevel(totalXP) {
+  let level = 0;
+  let threshold = XP_BASE_THRESHOLD;
+  let spent = 0;
+  while (level < MAX_PLAYER_LEVEL && totalXP >= spent + threshold) {
+    spent += threshold;
+    threshold = Math.ceil(threshold * XP_LEVEL_GROWTH);
+    level++;
+  }
+  return { level, xpIn: totalXP - spent, threshold: level < MAX_PLAYER_LEVEL ? threshold : 0 };
+}
+
+// Non-linear damage bonus at player level n. Starts at +2 per level and
+// accelerates quadratically — level 5 ≈ +11–13, level 10 ≈ +27–35.
+export function playerDamageBonus(level) {
+  const n = level;
+  return {
+    min: Math.floor(n * 2 + n * (n - 1) / 4),
+    max: Math.floor(n * 2 + n * (n - 1) / 2),
+  };
+}

@@ -8,9 +8,10 @@ import * as auth from "./lib/auth.js";
 import * as progress from "./lib/progress.js";
 import { initAuthUI, hideAuthScreen, showAuthScreen } from "./lib/authUI.js";
 import {
-  restartBtnEl, homeBtnEl, homePlayBtnEl,
+  restartBtnEl, worldMapBtnEl, homeBtnEl, homePlayBtnEl,
   worldCardBtnEl, worldBackBtnEl, worldPlayBtnEl, levelMapEl,
   worldPrevBtnEl, worldNextBtnEl, worldNavTitleEl,
+  diffPillsEl,
 } from "./core/dom.js";
 import { initChipDOM } from "./systems/chips.js";
 import { initAudio, updateMusic } from "./ui/audio.js";
@@ -18,6 +19,8 @@ import { update } from "./systems/update.js";
 import { render } from "./ui/render.js";
 import { fireInput } from "./systems/combat.js";
 import { startGame, goToStart } from "./game.js";
+import { toggleDebugPanel, isDebugOpen } from "./ui/debug.js";
+import { getDifficultyMult, setDifficultyMult } from "./lib/settings.js";
 
 // ---------- startup
 
@@ -69,6 +72,14 @@ requestAnimationFrame(loop);
 
 
 window.addEventListener("keydown", (ev) => {
+  // P toggles the debug panel at any point during a started run (skip if
+  // the event originates from a debug input so typing doesn't close it).
+  if (state.started && (ev.key === "p" || ev.key === "P") && ev.target.tagName !== "INPUT") {
+    toggleDebugPanel();
+    ev.preventDefault();
+    return;
+  }
+
   if (!state.started) {
     if (ev.key === "Enter" || ev.key === " ") {
       if (progress.isUnlocked(state.currentWorld, state.selectedLevel)) {
@@ -154,8 +165,27 @@ worldPlayBtnEl.addEventListener("click", () => {
 // Back button
 worldBackBtnEl.addEventListener("click", () => { state.menuScreen = "home"; });
 
-// Game over: replay the same level, or return home
+// Difficulty pills
+function syncDiffPills() {
+  const cur = getDifficultyMult();
+  for (const btn of diffPillsEl.querySelectorAll(".diffPill")) {
+    btn.classList.toggle("active", parseFloat(btn.dataset.mult) === cur);
+  }
+}
+diffPillsEl.addEventListener("click", (ev) => {
+  const btn = ev.target.closest(".diffPill");
+  if (!btn) return;
+  setDifficultyMult(parseFloat(btn.dataset.mult));
+  syncDiffPills();
+});
+syncDiffPills();
+
+// Game over: replay, go to world map, or return home
 restartBtnEl.addEventListener("click", () => {
   startGame(state.selectedWorld, state.selectedLevel);
+});
+worldMapBtnEl.addEventListener("click", () => {
+  goToStart();
+  state.menuScreen = "world";
 });
 homeBtnEl.addEventListener("click", goToStart);

@@ -142,9 +142,9 @@ body {
 .tick2.passed { background: #ef4444; border-color: #fca5a5; box-shadow: 0 0 10px rgba(239, 68, 68, 0.6); }
 
 #lives {
-  color: #ef4444;
-  font-size: 22px;
-  letter-spacing: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 #muteBtn {
@@ -372,8 +372,13 @@ body {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: rgba(10, 10, 20, 0.85);
+  background: #0a0a14;
   text-align: center;
+  animation: goFadeIn 0.25s ease-out both;
+}
+@keyframes goFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 #gameover[hidden] { display: none; }
@@ -386,12 +391,12 @@ body {
 
 #gameover h1.victory {
   color: #34d399;
-  animation: titlePop 0.4s ease-out both;
+  animation: titleZoom 0.6s cubic-bezier(0.2, 1.35, 0.4, 1) both;
 }
-@keyframes titlePop {
-  0%   { transform: scale(0.6); opacity: 0; }
-  70%  { transform: scale(1.08); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
+@keyframes titleZoom {
+  0%   { transform: scale(0.05); opacity: 0; }
+  65%  { transform: scale(1.1);  opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
 }
 
 /* ----- victory star reveal ----- */
@@ -420,13 +425,13 @@ body {
   text-shadow: 0 0 16px rgba(251, 191, 36, 0.85), 0 0 34px rgba(251, 191, 36, 0.45);
 }
 
-/* staggered pop-in, replayed each win via the .show toggle */
+/* staggered pop-in after title zoom settles (~0.65s) */
 .victoryStars.show .vStar {
   animation: starPop 0.5s cubic-bezier(0.2, 1.5, 0.45, 1) both;
 }
-.victoryStars.show .vStar:nth-child(1) { animation-delay: 0.10s; }
-.victoryStars.show .vStar:nth-child(2) { animation-delay: 0.38s; }
-.victoryStars.show .vStar:nth-child(3) { animation-delay: 0.66s; }
+.victoryStars.show .vStar:nth-child(1) { animation-delay: 0.75s; }
+.victoryStars.show .vStar:nth-child(2) { animation-delay: 1.03s; }
+.victoryStars.show .vStar:nth-child(3) { animation-delay: 1.31s; }
 
 /* expanding ring burst behind each earned star, timed to its pop */
 .victoryStars.show .vStar.earned::after {
@@ -443,9 +448,9 @@ body {
   opacity: 0;
   animation: starBurst 0.6s ease-out both;
 }
-.victoryStars.show .vStar:nth-child(1).earned::after { animation-delay: 0.22s; }
-.victoryStars.show .vStar:nth-child(2).earned::after { animation-delay: 0.50s; }
-.victoryStars.show .vStar:nth-child(3).earned::after { animation-delay: 0.78s; }
+.victoryStars.show .vStar:nth-child(1).earned::after { animation-delay: 0.87s; }
+.victoryStars.show .vStar:nth-child(2).earned::after { animation-delay: 1.15s; }
+.victoryStars.show .vStar:nth-child(3).earned::after { animation-delay: 1.43s; }
 
 @keyframes starPop {
   0%   { transform: scale(0) rotate(-35deg); opacity: 0; }
@@ -456,6 +461,72 @@ body {
   0%   { transform: scale(0.2); opacity: 0.9; }
   100% { transform: scale(2.3); opacity: 0; }
 }
+
+/* ----- victory XP gain bar ----- */
+.xpGain {
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+.xpGain.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.xpGain[hidden] { display: none; }
+
+.xpGainRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.xpGainAmt {
+  font-size: 18px;
+  font-weight: 800;
+  color: #2dd4bf;
+  letter-spacing: 1px;
+  transition: color 0.3s;
+}
+.xpGainAmt.zero { color: #475569; }
+.xpGainAmt.levelUp {
+  color: #fbbf24;
+  animation: xpLevelUpPulse 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes xpLevelUpPulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.xpGainLevel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+}
+.xpGainTrack {
+  height: 7px;
+  background: #1f2840;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.xpGainFill {
+  height: 100%;
+  background: linear-gradient(90deg, #2dd4bf, #22d3ee);
+  border-radius: 99px;
+  box-shadow: 0 0 8px rgba(45, 212, 191, 0.5);
+}
+.xpReplayTip {
+  font-size: 10px;
+  color: #f59e0b;
+  text-align: center;
+  opacity: 0.8;
+  letter-spacing: 0.3px;
+}
+.xpReplayTip[hidden] { display: none; }
 
 .goBtns {
   display: flex;
@@ -589,6 +660,7 @@ body {
   flex-direction: column;
   justify-content: center;
   gap: 16px;
+  padding-bottom: 20px;
   z-index: 1;
 }
 
@@ -632,6 +704,75 @@ body {
 .statValue { font-size: 24px; font-weight: 800; color: #f8fafc; }
 .statValue.gold { color: #fbbf24; }
 .statSub { font-size: 13px; font-weight: 700; color: #d6a743; }
+
+.xpBar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.xpBarTrack {
+  height: 6px;
+  background: #1f2840;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.xpBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, #2dd4bf, #22d3ee);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+.xpBarLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2dd4bf;
+  letter-spacing: 0.5px;
+}
+
+.homeTip {
+  font-size: 11px;
+  color: #4a5a72;
+  text-align: center;
+  letter-spacing: 0.3px;
+  line-height: 1.4;
+}
+
+.diffRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.diffLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #8593ab;
+  white-space: nowrap;
+}
+.diffPills {
+  display: flex;
+  gap: 6px;
+}
+.diffPill {
+  flex: 1;
+  padding: 6px 12px;
+  border-radius: 99px;
+  border: 1px solid #1f2840;
+  background: #131a2b;
+  color: #8593ab;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.diffPill.active {
+  background: #1e3a5f;
+  border-color: #2dd4bf;
+  color: #2dd4bf;
+}
 
 .bigPlayBtn {
   display: flex;
@@ -764,6 +905,19 @@ body {
   gap: 6px;
 }
 
+.reqLabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #f59e0b;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.reqLabel[hidden] { display: none; }
+.reqLabel.met { color: #334155; }
+
 .levelStars {
   display: flex;
   gap: 3px;
@@ -832,6 +986,14 @@ body {
   background: #141d33;
   border: 1.5px solid #283353;
   color: #5b6b8c;
+  box-shadow: none;
+}
+
+/* path is clear but star threshold not yet reached — show number, no padlock */
+.node.starGated {
+  background: #141d33;
+  border: 1.5px dashed #3a4a6e;
+  color: #4a5a7c;
   box-shadow: none;
 }
 /* locked nodes hide their number/label and show a padlock instead */
@@ -903,6 +1065,8 @@ body {
   letter-spacing: 4px;
   text-shadow: 0 0 32px rgba(103, 232, 249, 0.6);
   margin-bottom: 4px;
+  text-align: center;
+  width: 100%;
 }
 
 .authSubtitle {
@@ -911,6 +1075,7 @@ body {
   letter-spacing: 1px;
   margin: 0 0 16px;
   text-align: center;
+  width: 100%;
 }
 
 .authForm {
@@ -1053,4 +1218,69 @@ kbd {
   border-radius: 4px;
   padding: 2px 8px;
   font-family: inherit;
+}
+
+/* ===== Debug panel ===== */
+#debugPanel {
+  position: absolute;
+  top: 86px;
+  right: 10px;
+  z-index: 9999;
+  background: rgba(5, 5, 16, 0.92);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 10px 10px;
+  min-width: 210px;
+  backdrop-filter: blur(6px);
+  font-size: 11px;
+  color: #94a3b8;
+  pointer-events: all;
+}
+
+#debugPanel[hidden] { display: none; }
+
+.dbgTitle {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #f59e0b;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.dbgSep {
+  font-size: 9px;
+  color: #475569;
+  margin: 6px 0 3px;
+  letter-spacing: 0.5px;
+}
+
+.dbgRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.dbgLabel {
+  flex: 1;
+  color: #94a3b8;
+}
+
+.dbgInput {
+  width: 68px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 5px;
+  text-align: right;
+}
+
+.dbgInput:focus {
+  outline: none;
+  border-color: #f59e0b;
 }

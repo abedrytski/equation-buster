@@ -6,7 +6,7 @@ import { laneX, playerY } from "../core/view.js";
 import { maxEnemiesForWave, accrueMaxScore } from "./waves.js";
 import { rebuildChips } from "./chips.js";
 import {
-  spawnTableFor, NUM_LANES, MAX_LIVES,
+  spawnTableFor, NUM_LANES, MAX_HP,
   TOP_SPAWN_Y, SPAWN_HEAD_CLEARANCE,
 } from "../core/config.js";
 import { TYPES } from "./enemies/index.js";
@@ -114,7 +114,7 @@ export function bonusAllowedNow(type, spec) {
     const need = Math.max(2, Math.ceil(maxEnemiesForWave(state.wave) * spec.requiresMovers));
     if (movers < need) return false;
   }
-  if (spec.requiresMissingLife && state.lives >= MAX_LIVES) return false;
+  if (spec.requiresMissingHP && state.hp >= MAX_HP) return false;
   return true;
 }
 
@@ -176,17 +176,19 @@ export function spawnEnemy(maxValue) {
   if (spec.bonus) state.bonusSpawnedThisWave[type] = (state.bonusSpawnedThisWave[type] || 0) + 1;
 
   const eq = sharedEq(() => spec.eq(state.config.maxNum, state.config.additional_terms));
+  const hp = Math.ceil(spec.hp * state.config.hp_mult);
   const enemy = {
     type, x, y, lane,
     text: eq.text, answer: eq.answer,
-    hp: spec.hp,
-    maxHp: spec.hp,
+    hp,
+    maxHp: hp,
     radius: spec.radius,
     speed: spec.speed,
     color: spec.color,
     value: spec.value,
     spawnFade: 0,
   };
+  if (spec.hasShield) { enemy.shielded = true; enemy.shieldRegenTimer = 0; }
   if (spec.lifetime) enemy.timeLeft = spec.lifetime;
   state.enemies.push(enemy);
   // count this enemy toward the level's flawless-run max score (bonuses don't score)

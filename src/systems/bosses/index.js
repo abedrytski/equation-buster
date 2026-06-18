@@ -12,7 +12,7 @@ export const BOSSES = { mirror, summoner };
 
 // Which boss appears on each boss wave, by occurrence (1-based). Extra boss
 // waves clamp to the last entry.
-export const BOSS_ORDER = ["mirror", "summoner"];
+export const BOSS_ORDER = ["summoner", "mirror"];
 
 export function getBossDef(boss) {
   return BOSSES[boss.kind];

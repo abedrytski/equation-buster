@@ -25,12 +25,13 @@ function spawnSummon(parent) {
     y = minY + Math.random() * (maxY - minY);
     if (Math.hypot(x - parent.x, y - parent.y) >= parent.radius + 40) break;
   }
+  const hp = Math.ceil(spec.hp * state.config.hp_mult);
   state.enemies.push({
     type: "summon",
     parent,
     x, y, lane: null,
     text: eq.text, answer: eq.answer,
-    hp: spec.hp, maxHp: spec.hp,
+    hp, maxHp: hp,
     radius: spec.radius,
     speed: spec.speed,
     color: spec.color,
@@ -96,6 +97,25 @@ export default {
   },
 
   label() {
-    return "✦ THE SUM MONER ✦";
+    return "✦ THE SUMMONER ✦";
+  },
+
+  drawLabel(ctx, boss) {
+    const parts = [
+      { text: "✦ THE ", color: "rgba(255,255,255,0.85)" },
+      { text: "SUM",    color: "#fbbf24" },
+      { text: "MONER ✦", color: "rgba(255,255,255,0.85)" },
+    ];
+    ctx.font = "bold 12px ui-monospace, Menlo, monospace";
+    ctx.textBaseline = "middle";
+    const totalW = parts.reduce((w, p) => w + ctx.measureText(p.text).width, 0);
+    let x = boss.x - totalW / 2;
+    ctx.textAlign = "left";
+    for (const { text, color } of parts) {
+      ctx.fillStyle = color;
+      ctx.fillText(text, x, boss.y - 6);
+      x += ctx.measureText(text).width;
+    }
+    ctx.textAlign = "center";
   },
 };

@@ -20,7 +20,7 @@ export async function getOrCreateUser(userId) {
     // No row yet — create one.
     const { data: created, error: insertError } = await sb
       .from("profiles")
-      .insert([{ id: userId, display_name: "Player", total_points: 0, current_world: 1 }])
+      .insert([{ id: userId, display_name: "Player", total_points: 0, total_xp: 0, current_world: 1 }])
       .select()
       .single();
     if (insertError) console.error("Failed to create profile:", insertError);

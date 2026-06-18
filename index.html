@@ -63,9 +63,10 @@
           <div class="avatar" id="profileAvatar">P</div>
           <div class="profileText">
             <span class="profileName" id="profileName">Player</span>
-            <span class="profileLevel" id="profileStars">0 ★</span>
+            <span class="profileLevel" id="profileStars">Lv 1</span>
           </div>
         </div>
+        <button id="homeMuteBtn" class="iconBtn" type="button" aria-label="mute music">🔊</button>
         <button id="settingsBtn" class="iconBtn" type="button" aria-label="settings">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
@@ -83,13 +84,33 @@
 
         <div class="statCards">
           <div class="statCard">
-            <span class="statLabel">✦ Points</span>
-            <span class="statValue" id="homePoints">0</span>
-          </div>
-          <div class="statCard">
             <span class="statLabel">★ Stars</span>
             <span class="statValue gold" id="homeStars">0</span>
             <span class="statSub" id="homeStarsSub">Keep going!</span>
+          </div>
+          <div class="statCard">
+            <span class="statLabel">✦ Damage</span>
+            <span class="statValue" id="homePlayerDmg">13–15</span>
+            <span class="statSub" id="homePlayerDmgSub">next level: +?</span>
+          </div>
+          <div class="statCard">
+            <span class="statLabel">♥ Max HP</span>
+            <span class="statValue" id="homeMaxHp">10</span>
+          </div>
+        </div>
+        <div class="xpBar">
+          <div class="xpBarTrack"><div class="xpBarFill" id="homeXpFill" style="width:0%"></div></div>
+          <span class="xpBarLabel" id="homeXpLabel">0 / 250 XP · Lv 1</span>
+        </div>
+        <p class="homeTip">Tip: Re-play the level just below your frontier to farm XP</p>
+        <div class="diffRow">
+          <span class="diffLabel">Difficulty (impacts xp gain)</span>
+          <div class="diffPills" id="diffPills">
+            <button class="diffPill" data-mult="0.5" type="button">0.5×</button>
+            <button class="diffPill" data-mult="1" type="button">1×</button>
+            <button class="diffPill" data-mult="1.5" type="button">1.5×</button>
+            <button class="diffPill" data-mult="2" type="button">2×</button>
+            <button class="diffPill" data-mult="3" type="button">3×</button>
           </div>
         </div>
       </div>
@@ -129,26 +150,31 @@
         <svg class="levelMapSvg" width="100%" height="100%" style="position: absolute; inset: 0; pointer-events: none;"></svg>
 
         <div class="levelNodeWrapper lane-center" data-level="5">
+          <div class="reqLabel"></div>
           <div class="levelStars"><span class="star">★</span><span class="star">★</span><span class="star">★</span></div>
           <button class="node boss" data-level="5" data-unlocked="false"><span class="nodeKicker">Boss</span></button>
         </div>
 
         <div class="levelNodeWrapper lane-right" data-level="4">
+          <div class="reqLabel"></div>
           <div class="levelStars"><span class="star">★</span><span class="star">★</span><span class="star">★</span></div>
           <button class="node" data-level="4" data-unlocked="false"><span class="nodeNum">4</span></button>
         </div>
 
         <div class="levelNodeWrapper lane-left" data-level="3">
+          <div class="reqLabel"></div>
           <div class="levelStars"><span class="star">★</span><span class="star">★</span><span class="star">★</span></div>
           <button class="node" data-level="3" data-unlocked="false"><span class="nodeNum">3</span></button>
         </div>
 
         <div class="levelNodeWrapper lane-right" data-level="2">
+          <div class="reqLabel"></div>
           <div class="levelStars"><span class="star">★</span><span class="star">★</span><span class="star">★</span></div>
           <button class="node" data-level="2" data-unlocked="false"><span class="nodeNum">2</span></button>
         </div>
 
         <div class="levelNodeWrapper lane-left" data-level="1">
+          <div class="reqLabel"></div>
           <div class="levelStars"><span class="star">★</span><span class="star">★</span><span class="star">★</span></div>
           <button class="node" data-level="1" data-unlocked="true"><span class="nodeNum">1</span></button>
         </div>
@@ -171,8 +197,17 @@
       </div>
       <h1 id="gameoverTitle">Game Over</h1>
       <p id="finalScore"></p>
+      <div id="xpGain" class="xpGain" hidden>
+        <div class="xpGainRow">
+          <span class="xpGainAmt" id="xpGainAmt">+0 XP</span>
+          <span class="xpGainLevel" id="xpGainLevel">Lv 1</span>
+        </div>
+        <div class="xpGainTrack"><div class="xpGainFill" id="xpGainFill" style="width:0%"></div></div>
+        <p class="xpReplayTip" id="xpReplayTip" hidden>Only the frontier and one level below give XP</p>
+      </div>
       <div class="goBtns">
         <button id="restartBtn">Play again</button>
+        <button id="worldMapBtn">World Map</button>
         <button id="homeBtn">Home</button>
       </div>
     </div>
@@ -191,8 +226,11 @@
     </div>
 
     </div>
-    <audio id="bgm" src="./music/background.mp3" loop preload="auto"></audio>
-    <audio id="bossBgm" src="./music/boss.mp3" loop preload="auto"></audio>
+    <audio id="menuBgm" src="./music/main_menu.mp3" loop preload="auto"></audio>
+    <audio id="bgm"     src="./music/waves.mp3"    loop preload="auto"></audio>
+    <audio id="levelSuccessSfx" src="./music/level_success.mp3"   preload="auto"></audio>
+    <audio id="gameOverSfx"   src="./music/game_over.mp3"         preload="auto"></audio>
+    <audio id="laserSfx"      src="./music/laser.mp3"             preload="auto"></audio>
     <!-- Runtime config (Supabase URL + anon key from serve.ts env vars) -->
     <script src="/env.js"></script>
     <!-- Supabase client library -->

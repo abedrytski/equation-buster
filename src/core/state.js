@@ -1,7 +1,7 @@
 // The single mutable game-state object, plus a factory for a fresh run.
 // Other modules import `state` and mutate it in place (never reassign it).
 
-import { MAX_LIVES, WAVES_PER_LEVEL } from "./config.js";
+import { MAX_HP, PLAYER_DAMAGE_MIN, PLAYER_DAMAGE_MAX, WAVES_PER_LEVEL } from "./config.js";
 
 // Per-game state, reset at the start of every run. Music fields live outside
 // this factory because they persist across games (mute pref + current track).
@@ -18,7 +18,10 @@ export function freshGameState() {
     scoreMax: 0,           // theoretical max score for the level (for stars)
     perfectKills: 0,       // hypothetical flawless-run kill counter (for scoreMax)
     lastStars: 0,          // stars earned when the run ended in victory
-    lives: MAX_LIVES,
+    hp: MAX_HP,
+    playerDamageMin: PLAYER_DAMAGE_MIN,
+    playerDamageMax: PLAYER_DAMAGE_MAX,
+    damageNums: [],
     enemies: [],
     lasers: [],
     deaths: [],

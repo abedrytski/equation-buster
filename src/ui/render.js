@@ -4,7 +4,11 @@
 import { state } from "../core/state.js";
 import { ctx } from "../core/dom.js";
 import { W, H, playerX, playerY, laneX } from "../core/view.js";
-import { GRID_SIZE, NUM_LANES, MAX_LIVES, WRONG_FLASH_DURATION } from "../core/config.js";
+import {
+  GRID_SIZE, NUM_LANES, MAX_HP, WRONG_FLASH_DURATION,
+  PLAYER_DAMAGE_MIN, PLAYER_DAMAGE_MAX,
+  xpProgressInLevel, playerDamageBonus, MAX_PLAYER_LEVEL,
+} from "../core/config.js";
 import { TYPES } from "../systems/enemies/index.js";
 import { cycleProgress, streakMult, streakTierClass, isBossWave } from "../systems/waves.js";
 import { getBossDef } from "../systems/bosses/index.js";
@@ -19,7 +23,8 @@ import {
   worldProgressFillEl, worldProgressTextEl, worldPlayLabelEl,
   worldHeaderKickerEl, worldHeaderNameEl, worldStarBadgeEl,
   homeWorldKickerEl, homeWorldNameEl, homeWorldFillEl, homeWorldProgressEl,
-  homePointsEl, homeStarsEl, homePlaySubEl, profileNameEl, profileAvatarEl, profileStarsEl,
+  homeStarsEl, homePlaySubEl, profileNameEl, profileAvatarEl, profileStarsEl,
+  homePlayerDmgEl, homePlayerDmgSubEl, homeMaxHpEl, homeXpFillEl, homeXpLabelEl,
 } from "../core/dom.js";
 
 // ---------- primitive shapes
@@ -130,8 +135,8 @@ function drawEnemy(e) {
     ctx.stroke();
   }
 
-  // shield aura (blue, hp > 1)
-  if (spec.hasShield && e.hp > 1) {
+  // shield aura (blue, when shield is active)
+  if (e.shielded) {
     const t = performance.now() / 400;
     ctx.beginPath();
     ctx.arc(e.x, e.y, e.radius * 1.55, 0, Math.PI * 2);
@@ -215,29 +220,30 @@ function drawEnemy(e) {
     }
   }
 
-  // hp hearts for hexagon
-  if (spec.shape === "hex") {
-    ctx.font = "bold 14px ui-monospace, Menlo, monospace";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    const total = e.maxHp;
-    for (let i = 0; i < total; i++) {
-      ctx.fillStyle = i < e.hp ? "#ef4444" : "rgba(239, 68, 68, 0.25)";
-      ctx.fillText(
-        i < e.hp ? "♥" : "♡",
-        e.x - (total - 1) * 7 + i * 14,
-        e.y + e.radius * 0.35,
-      );
-    }
+  // HP bar for all regular enemies (not bosses or bonus pickups)
+  if (!spec.bonus && spec.shape !== "boss") {
+    const barW = e.radius * 1.8;
+    const barH = 3;
+    const barX = e.x - barW / 2;
+    const barY = e.y + e.radius + 5;
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = color;
+    ctx.fillRect(barX, barY, barW * Math.max(0, e.hp / e.maxHp), barH);
   }
 
   // boss: HP bar + tier label (with rage marker in phase 3)
   if (spec.shape === "boss") {
-    ctx.fillStyle = e.phase === 3 ? "#fecaca" : "rgba(255, 255, 255, 0.85)";
     ctx.font = "bold 12px ui-monospace, Menlo, monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(getBossDef(e).label(e), e.x, e.y - 6);
+    const bDef = getBossDef(e);
+    if (bDef.drawLabel) {
+      bDef.drawLabel(ctx, e);
+    } else {
+      ctx.fillStyle = e.phase === 3 ? "#fecaca" : "rgba(255, 255, 255, 0.85)";
+      ctx.fillText(bDef.label(e), e.x, e.y - 6);
+    }
 
     const barW = e.radius * 1.5;
     const barH = 6;
@@ -370,11 +376,32 @@ function renderHomeScreen() {
   const done = progress.completedInWorld(f.world);
   homeWorldFillEl.style.width = `${((done / LEVELS_PER_WORLD) * 100).toFixed(0)}%`;
   homeWorldProgressEl.textContent = `${done}/${LEVELS_PER_WORLD}`;
-  homePointsEl.textContent = progress.getTotalPoints().toLocaleString("en-US");
   homeStarsEl.textContent = String(progress.getTotalStars());
   const lvlLabel = f.level >= LEVELS_PER_WORLD ? "Boss" : `Level ${f.level}`;
   const verb = progress.getTotalPoints() > 0 ? "Continue" : "Start";
   homePlaySubEl.textContent = `${verb} · ${lvlLabel}`;
+
+  const { level: pl, xpIn, threshold } = xpProgressInLevel(progress.getTotalXP());
+  const { min: dmgBonusMin, max: dmgBonusMax } = playerDamageBonus(pl);
+  homePlayerDmgEl.textContent = `${PLAYER_DAMAGE_MIN + dmgBonusMin}–${PLAYER_DAMAGE_MAX + dmgBonusMax}`;
+  if (pl < MAX_PLAYER_LEVEL) {
+    const { min: nextMin, max: nextMax } = playerDamageBonus(pl + 1);
+    const deltaMin = nextMin - dmgBonusMin;
+    const deltaMax = nextMax - dmgBonusMax;
+    homePlayerDmgSubEl.textContent = deltaMin === deltaMax
+      ? `next level: +${deltaMin}`
+      : `next level: +${deltaMin}–+${deltaMax}`;
+  } else {
+    homePlayerDmgSubEl.textContent = "max level";
+  }
+  homeMaxHpEl.textContent = String(MAX_HP);
+  if (pl < MAX_PLAYER_LEVEL) {
+    homeXpFillEl.style.width = `${((xpIn / threshold) * 100).toFixed(1)}%`;
+    homeXpLabelEl.textContent = `${xpIn} / ${threshold} XP · Lv ${pl + 1}`;
+  } else {
+    homeXpFillEl.style.width = "100%";
+    homeXpLabelEl.textContent = `Max level · Lv ${pl + 1}`;
+  }
 
   const user = getCurrentUser();
   if (user?.email) {
@@ -382,7 +409,7 @@ function renderHomeScreen() {
     profileNameEl.textContent = name;
     profileAvatarEl.textContent = name.charAt(0).toUpperCase();
   }
-  profileStarsEl.textContent = `${progress.getTotalStars()} ★`;
+  profileStarsEl.textContent = `Lv ${pl + 1}`;
 }
 
 function renderWorldScreen() {
@@ -403,25 +430,42 @@ function renderWorldScreen() {
     state.selectedLevel = progress.defaultLevel(w);
   }
 
+  const totalStars = progress.getTotalStars();
   for (let l = 1; l <= LEVELS_PER_WORLD; l++) {
     const wrapper = document.querySelector(`.levelNodeWrapper[data-level="${l}"]`);
     if (!wrapper) continue;
     const node = wrapper.querySelector(".node");
     const isBoss = l === LEVELS_PER_WORLD;
-    const unlocked = progress.isUnlocked(w, l);
-    const completed = progress.isCompleted(w, l);
+    const unlocked   = progress.isUnlocked(w, l);
+    const completed  = progress.isCompleted(w, l);
+    const pathOk     = progress.isPathAccessible(w, l);
 
     node.dataset.unlocked = unlocked ? "true" : "false";
-    node.classList.toggle("locked", !unlocked);
-    node.classList.toggle("done", completed && !isBoss);
-    node.classList.toggle("boss", isBoss);
-    node.classList.toggle("current", unlocked && !completed && !isBoss);
-    node.classList.toggle("selected", l === state.selectedLevel);
+    // padlock only when path itself is blocked; star-gated shows number dimly
+    node.classList.toggle("locked",    !pathOk);
+    node.classList.toggle("starGated", pathOk && !unlocked);
+    node.classList.toggle("done",      completed && !isBoss);
+    node.classList.toggle("boss",      isBoss);
+    node.classList.toggle("current",   unlocked && !completed && !isBoss);
+    node.classList.toggle("selected",  l === state.selectedLevel);
 
     const stars = progress.getStars(w, l);
     const starRow = wrapper.querySelector(".levelStars");
     starRow.querySelectorAll(".star").forEach((s, i) => s.classList.toggle("filled", i < stars));
     starRow.style.visibility = completed ? "visible" : "hidden";
+
+    // star requirement badge — always shows total/required even when met
+    const reqEl = wrapper.querySelector(".reqLabel");
+    if (reqEl) {
+      const req = progress.starRequirement(w, l);
+      if (req === 0) {
+        reqEl.hidden = true;
+      } else {
+        reqEl.hidden = false;
+        reqEl.textContent = `${totalStars} / ${req} ★`;
+        reqEl.className = unlocked ? "reqLabel met" : "reqLabel";
+      }
+    }
   }
 
   worldPlayLabelEl.textContent =
@@ -433,7 +477,9 @@ function renderWorldScreen() {
 // ---------- HUD (DOM) updates
 
 function renderHud() {
-  livesEl.textContent = "♥".repeat(state.lives) + "♡".repeat(MAX_LIVES - state.lives);
+  const hpRatio = state.hp / MAX_HP;
+  livesEl.style.color = hpRatio > 0.5 ? "#f8fafc" : hpRatio > 0.25 ? "#fbbf24" : "#ef4444";
+  livesEl.textContent = `♥ ${state.hp}/${MAX_HP}`;
   if (state.bossLevel) {
     waveTextEl.innerHTML = `<b>BOSS</b>`;
   } else {
@@ -553,6 +599,37 @@ export function render() {
     ctx.beginPath();
     ctx.arc(d.x, d.y, d.radius * (1 + t * 0.8), 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
+  }
+
+  // floating damage numbers with a small impact burst icon
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const d of state.damageNums) {
+    const t = 1 - d.life / d.maxLife;
+    const alpha = Math.max(0, 1 - t * 1.4);
+    const rise = t * 38;
+    const numColor = d.value === 0 ? "#93c5fd" : "#ffffff";
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // 4-ray burst icon to the left of the number
+    const bx = d.x - 14, by = d.y - rise;
+    const br = 5 + (1 - t) * 2;  // slightly larger when fresh
+    ctx.strokeStyle = d.value === 0 ? "#93c5fd" : "#facc15";
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    for (let r = 0; r < 4; r++) {
+      const a = (r / 4) * Math.PI;
+      ctx.moveTo(bx + Math.cos(a) * br, by + Math.sin(a) * br);
+      ctx.lineTo(bx - Math.cos(a) * br, by - Math.sin(a) * br);
+    }
+    ctx.stroke();
+
+    ctx.font = `bold 17px ui-monospace, Menlo, monospace`;
+    ctx.fillStyle = numColor;
+    ctx.fillText(String(d.value), d.x + 6, d.y - rise);
     ctx.restore();
   }
 

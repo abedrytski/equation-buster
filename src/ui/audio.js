@@ -1,20 +1,36 @@
-// Music control. Only one track plays at a time (iOS Safari ignores
-// audio.volume, so we pause one and play the other on transitions). Default is
-// muted; the user opts in via the 🔊 button, persisted in localStorage.
+// Music + SFX control.
+//
+// BGM tracks (looping):
+//   menu  → background.mp3   (home / world screens)
+//   bg    → waves.mp3        (normal wave combat)
+//   boss  → boss.mp3         (boss fights)
+//
+// One-shot SFX (non-looping):
+//   game_start.mp3, level_success.mp3, game_over.mp3, laser.mp3
 
 import { state } from "../core/state.js";
-import { bgmEl, bossBgmEl, muteBtnEl } from "../core/dom.js";
-import { MUSIC_BG_VOL, MUSIC_BOSS_VOL } from "../core/config.js";
+import {
+  menuBgmEl, bgmEl,
+  levelSuccessSfxEl, gameOverSfxEl, laserSfxEl,
+  muteBtnEl, homeMuteBtnEl,
+} from "../core/dom.js";
+import { MUSIC_BG_VOL } from "../core/config.js";
+import { primeSfx } from "./sfx.js";
+
+const MENU_VOL = 0.35;
+const SFX_VOL  = 0.65;
+
+const BGM     = { menu: menuBgmEl, bg: bgmEl };
+const BGM_VOL = { menu: MENU_VOL,  bg: MUSIC_BG_VOL };
 
 let audioPrimed = false;
 
 export function primeAudio() {
-  // Must be called from inside a user-gesture handler. Briefly plays each
-  // element muted, then pauses, so subsequent .play() calls (e.g. when the
-  // boss appears mid-game, outside any gesture) are allowed on iOS.
   if (audioPrimed) return;
   audioPrimed = true;
-  for (const el of [bgmEl, bossBgmEl]) {
+  primeSfx();
+  const all = [menuBgmEl, bgmEl, levelSuccessSfxEl, gameOverSfxEl, laserSfxEl];
+  for (const el of all) {
     el.muted = true;
     const p = el.play();
     if (p && p.catch) p.catch(() => {});
@@ -25,42 +41,66 @@ export function primeAudio() {
 
 function desiredTrack() {
   if (state.musicMuted) return "none";
-  if (!state.started || state.gameOver || state.paused) return "none";
-  return state.enemies.some((e) => e.type === "boss") ? "boss" : "bg";
+  if (state.paused) return "none";
+  if (state.gameOver || !state.started) return "menu";
+  return "bg"; // waves.mp3 for both normal and boss combat
 }
 
 export function updateMusic() {
   const desired = desiredTrack();
   if (desired === state.musicCurrentTrack) return;
-  if (state.musicCurrentTrack === "bg") bgmEl.pause();
-  else if (state.musicCurrentTrack === "boss") bossBgmEl.pause();
-  if (desired === "bg") {
-    bgmEl.volume = MUSIC_BG_VOL;
-    const p = bgmEl.play();
-    if (p && p.catch) p.catch(() => {});
-  } else if (desired === "boss") {
-    bossBgmEl.volume = MUSIC_BOSS_VOL;
-    const p = bossBgmEl.play();
+  const prev = BGM[state.musicCurrentTrack];
+  if (prev) prev.pause();
+  const next = BGM[desired];
+  if (next) {
+    next.volume = BGM_VOL[desired];
+    const p = next.play();
     if (p && p.catch) p.catch(() => {});
   }
   state.musicCurrentTrack = desired;
 }
 
-export function setMuted(muted) {
-  state.musicMuted = muted;
-  try { localStorage.setItem("ms_muted", muted ? "1" : "0"); } catch (_) { /* ignore */ }
-  muteBtnEl.classList.toggle("muted", muted);
-  muteBtnEl.textContent = muted ? "🔇" : "🔊";
+// --- one-shot SFX ---
+
+function playSfx(el, vol = SFX_VOL) {
+  if (state.musicMuted) return;
+  try {
+    el.currentTime = 0;
+    el.volume = vol;
+    const p = el.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch (_) {}
 }
 
-// Wire the mute button and restore the saved preference. Called once at startup.
+export function playLaser()        { playSfx(laserSfxEl,        0.15); }
+export function playLevelSuccess() { playSfx(levelSuccessSfxEl, 0.70); }
+export function playGameOver()     { playSfx(gameOverSfxEl,     0.65); }
+
+// --- mute toggle ---
+
+export function setMuted(muted) {
+  state.musicMuted = muted;
+  const icon = muted ? "🔇" : "🔊";
+  for (const btn of [muteBtnEl, homeMuteBtnEl]) {
+    btn.classList.toggle("muted", muted);
+    btn.textContent = icon;
+  }
+  updateMusic();
+}
+
+function onMuteClick() {
+  primeAudio();
+  const next = !state.musicMuted;
+  setMuted(next);
+  try { localStorage.setItem("ms_muted", next ? "1" : "0"); } catch (_) {}
+}
+
 export function initAudio() {
-  // Default: muted. Only an explicit "0" in storage means "user opted in".
-  try { state.musicMuted = localStorage.getItem("ms_muted") !== "0"; } catch (_) { /* ignore */ }
-  setMuted(state.musicMuted);
-  muteBtnEl.addEventListener("click", () => {
-    primeAudio();
-    setMuted(!state.musicMuted);
-    updateMusic();
-  });
+  const saved = (() => { try { return localStorage.getItem("ms_muted"); } catch (_) { return null; } })();
+  setMuted(saved === "1");
+  muteBtnEl.addEventListener("click", onMuteClick);
+  homeMuteBtnEl.addEventListener("click", onMuteClick);
+
+  // Prime audio on the first user interaction so menu music starts immediately.
+  document.addEventListener("click", () => { primeAudio(); updateMusic(); }, { once: true });
 }
