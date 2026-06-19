@@ -24,6 +24,9 @@ function bossEquation(phase) {
 export default {
   id: "mirror",
 
+  // its signature gimmick: the equation is drawn back-to-front.
+  mirrorEquation: true,
+
   spawn(tier) {
     // base 62 → ~100 HP at W1 normal (hp_mult ≈ 1.6); scales with world + diff.
     const boss = createBoss(tier, {

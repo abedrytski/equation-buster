@@ -5,9 +5,9 @@ import { state } from "../core/state.js";
 import { ctx } from "../core/dom.js";
 import { W, H, playerX, playerY, laneX } from "../core/view.js";
 import {
-  GRID_SIZE, NUM_LANES, MAX_HP, WRONG_FLASH_DURATION,
+  GRID_SIZE, NUM_LANES, MAX_HP, WRONG_FLASH_DURATION, SHIELD_REGEN_TIME,
   PLAYER_DAMAGE_MIN, PLAYER_DAMAGE_MAX,
-  xpProgressInLevel, playerDamageBonus, MAX_PLAYER_LEVEL,
+  xpProgressInLevel, playerDamageBonus, playerHpBonus, MAX_PLAYER_LEVEL,
 } from "../core/config.js";
 import { TYPES } from "../systems/enemies/index.js";
 import { cycleProgress, streakMult, streakTierClass, isBossWave } from "../systems/waves.js";
@@ -24,7 +24,7 @@ import {
   worldHeaderKickerEl, worldHeaderNameEl, worldStarBadgeEl,
   homeWorldKickerEl, homeWorldNameEl, homeWorldFillEl, homeWorldProgressEl,
   homeStarsEl, homePlaySubEl, profileNameEl, profileAvatarEl, profileStarsEl,
-  homePlayerDmgEl, homePlayerDmgSubEl, homeMaxHpEl, homeXpFillEl, homeXpLabelEl,
+  homePlayerDmgEl, homePlayerDmgSubEl, homeMaxHpEl, homeMaxHpSubEl, homeXpFillEl, homeXpLabelEl,
 } from "../core/dom.js";
 
 // ---------- primitive shapes
@@ -145,6 +145,16 @@ function drawEnemy(e) {
     ctx.stroke();
   }
 
+  // shield recharge ring — counter-clockwise fill while shield is regenerating
+  if (!e.shielded && e.shieldRegenTimer > 0) {
+    const frac = Math.min(1, e.shieldRegenTimer / SHIELD_REGEN_TIME);
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.radius + 5, -Math.PI / 2, -Math.PI / 2 - Math.PI * 2 * frac, true);
+    ctx.strokeStyle = `rgba(96, 165, 250, ${0.3 + 0.5 * frac})`;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+  }
+
   // mini-boss tether to its parent boss
   if (e.type === "mini" && e.parent) {
     ctx.save();
@@ -258,7 +268,8 @@ function drawEnemy(e) {
   // equation label: hidden for invulnerable boss; mirrored when boss is active
   if (e.type === "boss") {
     if (!e.invulnerable) {
-      drawEqLabel(e.x, e.y - e.radius - 8, e.text, color, true);
+      const mirrored = getBossDef(e).mirrorEquation === true;
+      drawEqLabel(e.x, e.y - e.radius - 8, e.text, color, mirrored);
     }
   } else {
     drawEqLabel(e.x, e.y - e.radius - 8, e.text, color);
@@ -394,7 +405,12 @@ function renderHomeScreen() {
   } else {
     homePlayerDmgSubEl.textContent = "max level";
   }
-  homeMaxHpEl.textContent = String(MAX_HP);
+  homeMaxHpEl.textContent = String(MAX_HP + playerHpBonus(pl));
+  if (pl < MAX_PLAYER_LEVEL) {
+    homeMaxHpSubEl.textContent = `next level: +${playerHpBonus(pl + 1) - playerHpBonus(pl)}`;
+  } else {
+    homeMaxHpSubEl.textContent = "max level";
+  }
   if (pl < MAX_PLAYER_LEVEL) {
     homeXpFillEl.style.width = `${((xpIn / threshold) * 100).toFixed(1)}%`;
     homeXpLabelEl.textContent = `${xpIn} / ${threshold} XP · Lv ${pl + 1}`;
@@ -477,9 +493,9 @@ function renderWorldScreen() {
 // ---------- HUD (DOM) updates
 
 function renderHud() {
-  const hpRatio = state.hp / MAX_HP;
+  const hpRatio = state.hp / state.maxHp;
   livesEl.style.color = hpRatio > 0.5 ? "#f8fafc" : hpRatio > 0.25 ? "#fbbf24" : "#ef4444";
-  livesEl.textContent = `♥ ${state.hp}/${MAX_HP}`;
+  livesEl.textContent = `♥ ${state.hp}/${state.maxHp}`;
   if (state.bossLevel) {
     waveTextEl.innerHTML = `<b>BOSS</b>`;
   } else {

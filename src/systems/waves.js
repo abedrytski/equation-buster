@@ -11,12 +11,6 @@ export function isBossWave() {
   return state.bossLevel === true;
 }
 
-export function waveValueBudget(wave) {
-  if (isBossWave()) return 0;
-  // grows ~12 value per wave; e.g., w1=16, w2=28, w4=52, w5=64
-  return 4 + wave * 8;
-}
-
 // progress across the whole level. Boss levels track boss HP depletion;
 // regular levels divide the bar into `totalWaves` equal segments.
 export function cycleProgress() {
@@ -32,17 +26,13 @@ export function waveProgress() {
     if (!boss) return 1.0;
     return 1.0 - boss.hp / boss.maxHp;
   }
-  const budget = waveValueBudget(state.wave);
-  if (budget <= 0) return 0;
-  // count value still pending: not yet spent + currently on screen.
-  // bar fills as enemies are spawned & resolved (killed, expired, or escaped).
-  let aliveValue = 0;
-  for (const e of state.enemies) {
-    const s = TYPES[e.type];
-    if (s) aliveValue += s.value;
-  }
-  const remaining = state.waveValueRemaining + aliveValue;
-  return Math.max(0, Math.min(1.0, 1 - remaining / budget));
+  const total = state.waveSpawnTotal;
+  if (total <= 0) return 0;
+  // pending = still queued + alive on screen; bar fills as enemies spawn and die.
+  let alive = 0;
+  for (const e of state.enemies) if (TYPES[e.type]) alive++;
+  const pending = state.spawnQueue.length + alive;
+  return Math.max(0, Math.min(1.0, 1 - pending / total));
 }
 
 // streak multiplier for an arbitrary streak count

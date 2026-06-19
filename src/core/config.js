@@ -1,6 +1,6 @@
 // Tunables + static data tables. The single place to balance the game.
 // Enemy descriptors live in ../systems/enemies/ (one file each); their per-level
-// spawn weights and the math difficulty are tuned here via LEVEL_PLAN.
+// spawn counts and the math difficulty are tuned here via LEVEL_PLAN.
 
 // ---------- core tunables
 
@@ -42,7 +42,7 @@ export const BOSS_EVERY_N_WAVES = 3;
 // short waves; the final level of a world is a single boss fight (no waves).
 export const LEVELS_PER_WORLD = 5;
 export const WAVES_PER_LEVEL = 2;
-export const NUM_WORLDS = 5;
+export const NUM_WORLDS = 3;
 
 // Display names per world (index 0 unused; worlds are 1-based).
 export const WORLD_NAMES = [
@@ -80,69 +80,51 @@ export const MAX_STREAK_MULT = STREAK_TIERS[STREAK_TIERS.length - 1].mult;
 //                        "a+b+c", 2 for "a+b+c+d", etc.
 //     hp_mult          — multiplier applied to each spawned enemy's base HP
 //                        (rounded up). 1.0 = base. Increases with world/level.
-//     spawn  — enemy proportions (weights), same shape as a row of the old
-//              SPAWN_TABLE. Bonus types (ice/heart) are still gated at spawn
-//              time. Empty {} for the boss level (level LEVELS_PER_WORLD), which
-//              is boss-only and never samples this.
+//     spawn  — exact count of each enemy type for the whole level. At run
+//              start, the full list is shuffled and split into WAVES_PER_LEVEL
+//              queues. Bonus types (ice/heart) are skipped at spawn time if
+//              their gate isn't met. Empty {} for boss levels.
 //
 // To add an enemy: give it a file under systems/enemies/, then add its id with
-// a weight to the cells where it should appear.
+// a count to the cells where it should appear.
 function lp(maxNum, additional_terms, hp_mult, spawn) {
   return { maxNum, additional_terms, hp_mult, spawn };
 }
 
 export const LEVEL_PLAN = {
-  // World 1 — Number Jungle: introduces the roster one enemy at a time.
+  // World 1 — Number Jungle: pure addition; yellow tapers as pink takes over so
+  // levels stay short instead of grinding through value-1 filler.
   1: {
-    1: lp(10, 0, 1.0, { yellow: 4, ice: 1 }),
-    2: lp(12, 0, 1.15, { yellow: 4, pink: 2, ice: 1, heart: 2 }),
-    3: lp(15, 0, 1.3, { yellow: 3, pink: 3, ice: 1, heart: 2 }),
-    4: lp(18, 0, 1.45, { yellow: 2, pink: 4, ice: 1, heart: 2 }),
+    1: lp(10, 0, 1.0, { yellow: 8, ice: 1 }),
+    2: lp(12, 0, 1.15, { yellow: 7, pink: 3, ice: 1, heart: 2 }),
+    3: lp(15, 0, 1.3, { yellow: 6, pink: 6, ice: 1, heart: 2 }),
+    4: lp(18, 0, 1.45, { yellow: 5, pink: 9, ice: 2, heart: 2 }),
     5: lp(20, 0, 1.6, {}),
   },
-  // World 2 — Adder's Peak: full roster online, hexagon brute appears.
+  // World 2 — Adder's Peak: subtraction (green) and the shielded brute (blue)
+  // join the roster; blue builds toward a shield-heavy L4 finale.
   2: {
-    1: lp(18, 0, 1.75, { yellow: 3, pink: 3, green: 1, ice: 1 }),
-    2: lp(20, 0, 1.9, { yellow: 2, pink: 3, green: 2, blue: 2, ice: 1, heart: 2 }),
-    3: lp(22, 0, 2.1, { yellow: 2, pink: 3, green: 3, blue: 2, ice: 1, heart: 2 }),
-    4: lp(25, 0, 2.25, { yellow: 2, pink: 2, green: 4, blue: 4, ice: 1, heart: 2 }),
+    1: lp(18, 0, 1.75, { yellow: 5, pink: 5, green: 1, ice: 1 }),
+    2: lp(20, 0, 1.9, { yellow: 5, pink: 5, green: 3, blue: 1, ice: 1, heart: 2 }),
+    3: lp(22, 0, 2.1, { yellow: 4, pink: 6, green: 5, blue: 2, ice: 1, heart: 2 }),
+    4: lp(25, 0, 2.25, { yellow: 3, pink: 4, green: 6, blue: 4, ice: 2, heart: 2 }),
     5: lp(28, 0, 2.4, {}),
   },
-  // World 3 — Times-Table Valley
+  // World 3 — Times-Table Valley: the hexagon brute headlines; blue is a steady
+  // presence so the shield mechanic stays in play throughout.
   3: {
-    1: lp(25, 0, 2.5, { yellow: 2, pink: 3, green: 2, blue: 2, hexagon: 1, ice: 1, heart: 1 }),
-    2: lp(28, 0, 2.65, { yellow: 2, pink: 2, green: 3, blue: 2, hexagon: 1, ice: 1, heart: 1 }),
-    3: lp(30, 0, 2.8, { yellow: 1, pink: 2, green: 3, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
-    4: lp(33, 0, 3.0, { yellow: 1, pink: 2, green: 2, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
+    1: lp(25, 0, 2.5, { yellow: 3, pink: 3, green: 5, blue: 3, hexagon: 2, ice: 1, heart: 2 }),
+    2: lp(28, 0, 2.65, { yellow: 3, pink: 3, green: 5, blue: 3, hexagon: 3, ice: 1, heart: 2 }),
+    3: lp(30, 0, 2.8, { yellow: 2, pink: 3, green: 5, blue: 4, hexagon: 4, ice: 2, heart: 2 }),
+    4: lp(33, 0, 3.0, { yellow: 2, pink: 3, green: 5, blue: 4, hexagon: 5, ice: 2, heart: 2 }),
     5: lp(36, 0, 3.15, {}),
-  },
-  // World 4 — Division Desert
-  4: {
-    1: lp(33, 0, 3.2, { yellow: 1, pink: 3, green: 2, blue: 2, hexagon: 1, ice: 1, heart: 1 }),
-    2: lp(36, 0, 3.4, { yellow: 1, pink: 2, green: 3, blue: 2, hexagon: 2, ice: 1, heart: 1 }),
-    3: lp(40, 0, 3.55, { pink: 2, green: 3, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
-    4: lp(44, 0, 3.7, { pink: 2, green: 2, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
-    5: lp(48, 0, 3.85, {}),
-  },
-  // World 5 — Fraction Falls
-  5: {
-    1: lp(45, 0, 3.9, { pink: 3, green: 2, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
-    2: lp(50, 0, 4.05, { pink: 2, green: 3, blue: 3, hexagon: 2, ice: 1, heart: 1 }),
-    3: lp(55, 0, 4.2, { pink: 2, green: 3, blue: 3, hexagon: 3, ice: 1, heart: 1 }),
-    4: lp(60, 0, 4.35, { pink: 2, green: 2, blue: 4, hexagon: 3, ice: 1, heart: 1 }),
-    5: lp(65, 0, 4.5, {}),
   }
-};
+}
 
 // Look up a level's plan, clamping out-of-range world/level to the last defined.
 export function levelPlan(world, level) {
   const w = LEVEL_PLAN[world] || LEVEL_PLAN[NUM_WORLDS];
   return w[level] || w[LEVELS_PER_WORLD];
-}
-
-// Enemy proportions (weights) for a given world/level — drives spawning.
-export function spawnTableFor(world, level) {
-  return levelPlan(world, level).spawn;
 }
 
 // ---------- difficulties
@@ -214,10 +196,10 @@ export const MUSIC_BOSS_VOL = 0.55;
 // ---------- player progression (XP / level)
 
 // Base XP per star at 1× difficulty. Scaled by difficulty in settings.js.
-export const XP_BASE_STARS = [0, 25, 50, 100];
+export const XP_BASE_STARS = [0, 50, 100, 150];
 // XP needed for level 1. Each subsequent level costs ×XP_LEVEL_GROWTH more.
 export const XP_BASE_THRESHOLD = 250;
-export const XP_LEVEL_GROWTH = 1.3;
+export const XP_LEVEL_GROWTH = 1.15;
 export const MAX_PLAYER_LEVEL = 30;
 
 // Returns { level, xpIn, threshold } from accumulated XP.
@@ -242,4 +224,11 @@ export function playerDamageBonus(level) {
     min: Math.floor(n * 2 + n * (n - 1) / 4),
     max: Math.floor(n * 2 + n * (n - 1) / 2),
   };
+}
+
+// HP bonus at player level n. Same quadratic shape as damage, half the base rate.
+// level 5 ≈ +6, level 10 ≈ +14, level 20 ≈ +39.
+export function playerHpBonus(level) {
+  const n = level;
+  return Math.floor(n + n * (n - 1) / 20);
 }

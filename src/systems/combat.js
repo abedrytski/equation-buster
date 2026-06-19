@@ -104,7 +104,7 @@ export function winLevel() {
 // kind needs no change, only a genuinely new kind does.
 function applyKillEffect(effect) {
   if (effect.freeze) state.freezeTimer = effect.freeze;
-  if (effect.heal) state.hp = Math.min(MAX_HP, state.hp + effect.heal);
+  if (effect.heal) state.hp = Math.min(state.maxHp, state.hp + effect.heal);
 }
 
 export function fireAnswer(answer) {

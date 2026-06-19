@@ -1,27 +1,26 @@
 // Music + SFX control.
 //
 // BGM tracks (looping):
-//   menu  → background.mp3   (home / world screens)
 //   bg    → waves.mp3        (normal wave combat)
 //   boss  → boss.mp3         (boss fights)
+// The menu / home / world screens play no music.
 //
 // One-shot SFX (non-looping):
 //   game_start.mp3, level_success.mp3, game_over.mp3, laser.mp3
 
 import { state } from "../core/state.js";
 import {
-  menuBgmEl, bgmEl,
+  bgmEl,
   levelSuccessSfxEl, gameOverSfxEl, laserSfxEl,
   muteBtnEl, homeMuteBtnEl,
 } from "../core/dom.js";
 import { MUSIC_BG_VOL } from "../core/config.js";
 import { primeSfx } from "./sfx.js";
 
-const MENU_VOL = 0.35;
 const SFX_VOL  = 0.65;
 
-const BGM     = { menu: menuBgmEl, bg: bgmEl };
-const BGM_VOL = { menu: MENU_VOL,  bg: MUSIC_BG_VOL };
+const BGM     = { bg: bgmEl };
+const BGM_VOL = { bg: MUSIC_BG_VOL };
 
 let audioPrimed = false;
 
@@ -29,7 +28,7 @@ export function primeAudio() {
   if (audioPrimed) return;
   audioPrimed = true;
   primeSfx();
-  const all = [menuBgmEl, bgmEl, levelSuccessSfxEl, gameOverSfxEl, laserSfxEl];
+  const all = [bgmEl, levelSuccessSfxEl, gameOverSfxEl, laserSfxEl];
   for (const el of all) {
     el.muted = true;
     const p = el.play();
@@ -42,7 +41,7 @@ export function primeAudio() {
 function desiredTrack() {
   if (state.musicMuted) return "none";
   if (state.paused) return "none";
-  if (state.gameOver || !state.started) return "menu";
+  if (state.gameOver || !state.started) return "none"; // no music on menus
   return "bg"; // waves.mp3 for both normal and boss combat
 }
 
@@ -101,6 +100,7 @@ export function initAudio() {
   muteBtnEl.addEventListener("click", onMuteClick);
   homeMuteBtnEl.addEventListener("click", onMuteClick);
 
-  // Prime audio on the first user interaction so menu music starts immediately.
+  // Prime audio on the first user interaction (browsers block autoplay until a
+  // gesture) so combat music can start the moment a level begins.
   document.addEventListener("click", () => { primeAudio(); updateMusic(); }, { once: true });
 }

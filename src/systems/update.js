@@ -10,21 +10,20 @@ import {
 } from "../core/config.js";
 import { TYPES } from "./enemies/index.js";
 import {
-  isBossWave, waveValueBudget, maxEnemiesForWave,
+  isBossWave, maxEnemiesForWave,
   spawnIntervalForWave, waveSpeedFactor, announceWave,
 } from "./waves.js";
-import { spawnEnemy } from "./entities.js";
+import { spawnEnemyOfType } from "./entities.js";
 import { getBossDef } from "./bosses/index.js";
 import { winLevel, endGame } from "./combat.js";
 import { rebuildChips } from "./chips.js";
 
 export function advanceWave() {
-  // regular levels only ever step between non-boss waves; the boss level spawns
-  // its boss up front in startGame, so there's no in-run boss spawn here.
   state.wave += 1;
   state.wavePhase = "active";
   state.waveTimer = 0;
-  state.waveValueRemaining = waveValueBudget(state.wave);
+  state.spawnQueue = [...(state.waveQueues[state.wave - 1] ?? [])];
+  state.waveSpawnTotal = state.spawnQueue.length;
   state.bonusSpawnedThisWave = {};
   announceWave();
 }
@@ -36,7 +35,7 @@ export function update(dt) {
   if (frozen) state.freezeTimer = Math.max(0, state.freezeTimer - dt);
 
   const bossAlive = state.enemies.some((e) => e.type === "boss");
-  const stillSpawning = state.waveValueRemaining > 0 && !isBossWave();
+  const stillSpawning = state.spawnQueue.length > 0 && !isBossWave();
   const waveCleared = !stillSpawning && state.enemies.length === 0;
 
   // wave phase machine (breather is allowed to tick during freeze so the freeze
@@ -60,8 +59,8 @@ export function update(dt) {
     state.spawnTimer -= dt;
     if (state.spawnTimer <= 0) {
       if (canSpawn && state.enemies.length < maxEnemiesForWave(state.wave)) {
-        const cost = spawnEnemy(state.waveValueRemaining);
-        state.waveValueRemaining = Math.max(0, state.waveValueRemaining - cost);
+        const consumed = spawnEnemyOfType(state.spawnQueue[0]);
+        if (consumed) state.spawnQueue.shift();
       }
       state.spawnTimer = spawnIntervalForWave(state.wave, state.config);
     }
@@ -149,7 +148,7 @@ export function update(dt) {
           }
         }
         const isBoss = e.type === "boss";
-        state.hp = isBoss ? 0 : Math.max(0, state.hp - (e.damage || 1));
+        state.hp = isBoss ? 0 : Math.max(0, state.hp - (TYPES[e.type]?.damage ?? 1));
         state.streak = 0;
         state.flashTimer = isBoss ? 0.6 : 0.35;
         state.shakeTimer = isBoss ? 0.6 : 0.35;

@@ -6,8 +6,7 @@ import { laneX, playerY } from "../core/view.js";
 import { maxEnemiesForWave, accrueMaxScore } from "./waves.js";
 import { rebuildChips } from "./chips.js";
 import {
-  spawnTableFor, NUM_LANES, MAX_HP,
-  TOP_SPAWN_Y, SPAWN_HEAD_CLEARANCE,
+  NUM_LANES, TOP_SPAWN_Y, SPAWN_HEAD_CLEARANCE,
 } from "../core/config.js";
 import { TYPES } from "./enemies/index.js";
 
@@ -61,63 +60,6 @@ export function sharedEq(genFn, exclude, tries = 40) {
   return distinct || genFn();
 }
 
-// ---------- spawn-table sampling
-
-// Enemy proportions for the level currently being played. Both waves of a level
-// share one plan (LEVEL_PLAN, keyed by world+level) — no longer per wave.
-export function currentSpawnTable() {
-  return spawnTableFor(state.selectedWorld, state.selectedLevel);
-}
-
-export function pickType(maxValue, exclude) {
-  const t = currentSpawnTable();
-  const usable = {};
-  let total = 0;
-  for (const k in t) {
-    if (exclude && exclude.has(k)) continue;
-    if (maxValue == null || TYPES[k].value <= maxValue) {
-      usable[k] = t[k];
-      total += t[k];
-    }
-  }
-  if (total === 0) {
-    // budget too small for anything in the table — fall back to the cheapest entry
-    let cheapest = null;
-    for (const k in t) {
-      if (exclude && exclude.has(k)) continue;
-      if (cheapest === null || TYPES[k].value < TYPES[cheapest].value) cheapest = k;
-    }
-    return cheapest || "yellow";
-  }
-  let r = Math.random() * total;
-  for (const k in usable) {
-    r -= usable[k];
-    if (r <= 0) return k;
-  }
-  return "yellow";
-}
-
-// Generic gate for any `bonus` type, driven entirely by the type's config:
-//   maxPerWave / maxOnScreen  - hard caps (default 1 each)
-//   requiresMovers: f         - only spawn when ≥ ceil(waveCap*f) movers exist
-//                               (a slow/freeze bonus is pointless with nothing
-//                               to slow)
-//   requiresMissingLife: true - only spawn when the player has lost a life
-export function bonusAllowedNow(type, spec) {
-  if ((state.bonusSpawnedThisWave[type] || 0) >= (spec.maxPerWave ?? 1)) return false;
-  let onScreen = 0;
-  for (const e of state.enemies) if (e.type === type) onScreen++;
-  if (onScreen >= (spec.maxOnScreen ?? 1)) return false;
-  if (spec.requiresMovers != null) {
-    let movers = 0;
-    for (const e of state.enemies) if (e.speed > 0) movers++;
-    const need = Math.max(2, Math.ceil(maxEnemiesForWave(state.wave) * spec.requiresMovers));
-    if (movers < need) return false;
-  }
-  if (spec.requiresMissingHP && state.hp >= MAX_HP) return false;
-  return true;
-}
-
 function pickSpawnLane() {
   // rank lanes by busy-ness (count asc), tie-break by topmost-enemy y desc
   // (more clearance preferred), then small randomness. Return -1 if no lane
@@ -144,31 +86,41 @@ function pickSpawnLane() {
   return -1;
 }
 
-export function spawnEnemy(maxValue) {
-  // exclude any bonus type whose spawn gate isn't currently satisfied
-  let exclude = null;
-  for (const k in TYPES) {
-    if (TYPES[k].bonus && !bonusAllowedNow(k, TYPES[k])) {
-      (exclude ||= new Set()).add(k);
-    }
-  }
-  const type = pickType(maxValue, exclude);
+// Spawn a specific enemy type from the pre-built wave queue.
+// Returns true when the queue entry should be consumed (success or gated-skip),
+// false when the spawn lane is full and the entry should be retried next tick.
+export function spawnEnemyOfType(type) {
   const spec = TYPES[type];
+  if (!spec) return true;
 
+  if (spec.bonus) {
+    if (spec.requiresMissingHP && state.hp >= state.maxHp) return true;
+    if (spec.requiresMovers != null) {
+      let movers = 0;
+      for (const e of state.enemies) if (e.speed > 0) movers++;
+      const need = Math.max(2, Math.ceil(maxEnemiesForWave(state.wave) * spec.requiresMovers));
+      if (movers < need) return true;
+    }
+    let onScreen = 0;
+    for (const e of state.enemies) if (e.type === type) onScreen++;
+    if (onScreen >= (spec.maxOnScreen ?? 1)) return true;
+  }
+
+  return _doSpawn(spec, type);
+}
+
+// Shared spawn body. Returns true on success, false if no lane available.
+function _doSpawn(spec, type) {
   let lane, x, y;
   if (spec.placement === "upper") {
-    // stationary bonus: pick a lane, place in the upper half (below the wave
-    // bar with label clearance)
     lane = Math.floor(Math.random() * NUM_LANES);
     x = laneX(lane);
     const top = TOP_SPAWN_Y + spec.radius;
     const topZoneBottom = Math.max(top + 40, playerY * 0.55);
     y = top + Math.random() * (topZoneBottom - top);
   } else {
-    // moving enemies appear right below the wave bar, fully visible with
-    // their equation label. Defer if no lane has clearance.
     lane = pickSpawnLane();
-    if (lane < 0) return 0;
+    if (lane < 0) return false;
     x = laneX(lane);
     y = TOP_SPAWN_Y + spec.radius;
   }
@@ -180,21 +132,17 @@ export function spawnEnemy(maxValue) {
   const enemy = {
     type, x, y, lane,
     text: eq.text, answer: eq.answer,
-    hp,
-    maxHp: hp,
-    radius: spec.radius,
-    speed: spec.speed,
-    color: spec.color,
-    value: spec.value,
+    hp, maxHp: hp,
+    radius: spec.radius, speed: spec.speed,
+    color: spec.color, value: spec.value,
     spawnFade: 0,
   };
   if (spec.hasShield) { enemy.shielded = true; enemy.shieldRegenTimer = 0; }
   if (spec.lifetime) enemy.timeLeft = spec.lifetime;
   state.enemies.push(enemy);
-  // count this enemy toward the level's flawless-run max score (bonuses don't score)
   if (spec.awardsScore !== false) accrueMaxScore(spec.value);
   rebuildChips();
-  return spec.value;
+  return true;
 }
 
 // ---------- shared effect helpers

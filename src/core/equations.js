@@ -66,6 +66,16 @@ export function mkAddNFloor(count, lo, hi) {
   return { text: nums.join("+"), answer: nums.reduce((s, n) => s + n, 0) };
 }
 
+// Fill-in-the-blank addition: knownCount known addends + hidden "?" = their sum.
+// e.g. knownCount=1 → "5+?=8", knownCount=2 → "3+5+?=11"
+export function mkMissingAddend(knownCount, eachMax) {
+  const known = [];
+  for (let i = 0; i < knownCount; i++) known.push(randInt(1, eachMax));
+  const missing = randInt(1, eachMax);
+  const sum = known.reduce((s, n) => s + n, 0) + missing;
+  return { text: `${known.join("+")}+?=${sum}`, answer: missing };
+}
+
 // Subtraction with a guaranteed minimum answer (aFloor).
 // aFloor ≥ 2 required; aMax must be > aFloor.
 export function mkSubFloor(aMax, aFloor) {

@@ -19,6 +19,7 @@ export function freshGameState() {
     perfectKills: 0,       // hypothetical flawless-run kill counter (for scoreMax)
     lastStars: 0,          // stars earned when the run ended in victory
     hp: MAX_HP,
+    maxHp: MAX_HP,
     playerDamageMin: PLAYER_DAMAGE_MIN,
     playerDamageMax: PLAYER_DAMAGE_MAX,
     damageNums: [],
@@ -39,7 +40,9 @@ export function freshGameState() {
     wave: 1,
     wavePhase: "active",   // "active" | "breather"
     waveTimer: 0,
-    waveValueRemaining: 0,
+    spawnQueue: [],        // ordered enemy types to spawn this wave (pre-built at wave start)
+    waveSpawnTotal: 0,    // total entries in spawnQueue at wave start (for progress bar)
+    waveQueues: [[], []], // pre-built queues for each wave of this level
     streak: 0,
     bestStreak: 0,
     freezeTimer: 0,
