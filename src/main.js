@@ -186,6 +186,7 @@ restartBtnEl.addEventListener("click", () => {
 });
 worldMapBtnEl.addEventListener("click", () => {
   goToStart();
+  state.selectedWorld = progress.getFurthest().world;
   state.menuScreen = "world";
 });
 homeBtnEl.addEventListener("click", goToStart);

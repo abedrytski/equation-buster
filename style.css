@@ -752,16 +752,16 @@ body {
 }
 .diffPills {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 .diffPill {
   flex: 1;
-  padding: 6px 12px;
+  padding: 10px 14px;
   border-radius: 99px;
   border: 1px solid #1f2840;
   background: #131a2b;
   color: #8593ab;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
