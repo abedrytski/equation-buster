@@ -52,11 +52,20 @@ export function updateMusic() {
   if (prev) prev.pause();
   const next = BGM[desired];
   if (next) {
+    next.currentTime = 0;
     next.volume = BGM_VOL[desired];
     const p = next.play();
     if (p && p.catch) p.catch(() => {});
   }
   state.musicCurrentTrack = desired;
+}
+
+export function restartMusic() {
+  const desired = desiredTrack();
+  const el = BGM[desired];
+  if (!el) return;
+  el.currentTime = 0;
+  if (desired !== state.musicCurrentTrack) updateMusic();
 }
 
 // --- one-shot SFX ---

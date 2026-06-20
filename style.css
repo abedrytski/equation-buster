@@ -752,10 +752,12 @@ body {
 }
 .diffPills {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .diffPill {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 56px;
   padding: 10px 14px;
   border-radius: 99px;
   border: 1px solid #1f2840;
