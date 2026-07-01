@@ -4,7 +4,7 @@
 
 import {
   LEVELS_PER_WORLD, NUM_WORLDS,
-  xpProgressInLevel, MAX_PLAYER_LEVEL,
+  xpProgressInLevel,
 } from "../core/config.js";
 import { getCurrentUser } from "./auth.js";
 import * as db from "./db.js";
@@ -14,7 +14,6 @@ let userId = null;
 const cache = new Map();
 let totalPoints = 0;
 let totalXP = 0;  // loaded from profile, not derived from stars
-let ready = false;
 
 const key = (w, l) => `${w}:${l}`;
 
@@ -31,7 +30,6 @@ export async function initProgress() {
   cache.clear();
   for (const r of rows) cache.set(key(r.world, r.level), r);
   recomputeTotals();
-  ready = true;
 }
 
 function recomputeTotals() {
@@ -55,15 +53,18 @@ export async function recordLevelWin(world, level, score, stars, xpEarned = 0) {
   });
 }
 
+// Reset the signed-in user back to a brand-new state: wipe their progress and
+// profile counters in the DB, then clear the in-memory cache so the menus
+// reflect it immediately. (XP / totals derive from the cache + totalXP.)
+export async function resetProgress() {
+  if (!userId) return;
+  await db.resetUserData(userId);
+  cache.clear();
+  totalPoints = 0;
+  totalXP = 0;
+}
+
 // --- derived getters (read synchronously by the renderer) ---
-
-export function isReady() {
-  return ready;
-}
-
-export function getLevelResult(world, level) {
-  return cache.get(key(world, level)) || null;
-}
 
 export function getStars(world, level) {
   const r = cache.get(key(world, level));

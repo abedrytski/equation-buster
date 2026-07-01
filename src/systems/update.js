@@ -3,7 +3,7 @@
 // line). Pure simulation — no drawing.
 
 import { state } from "../core/state.js";
-import { laneX, playerX, playerY } from "../core/view.js";
+import { laneX, playerY } from "../core/view.js";
 import {
   BREATHER_DURATION, SPAWN_FADE_DURATION,
   LANE_SEPARATION_GAP, SHIELD_REGEN_TIME,
@@ -115,6 +115,9 @@ export function update(dt) {
         if (!frozen) e.orbitAngle += e.orbitSpeed * dt;
         e.x = e.parent.x + Math.cos(e.orbitAngle) * e.orbitRadius;
         e.y = e.parent.y + Math.sin(e.orbitAngle) * e.orbitRadius;
+      } else {
+        state.enemies.splice(i, 1);   // parent dead → orphaned orbiter, sweep it
+        continue;
       }
     } else if (!frozen) {
       // straight-down lane movement

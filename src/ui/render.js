@@ -12,6 +12,7 @@ import {
 import { TYPES } from "../systems/enemies/index.js";
 import { cycleProgress, streakMult, streakTierClass, isBossWave } from "../systems/waves.js";
 import { getBossDef } from "../systems/bosses/index.js";
+import { drawEquation } from "./equation.js";
 import { LEVELS_PER_WORLD, NUM_WORLDS, WORLD_NAMES } from "../core/config.js";
 import { getCurrentUser } from "../lib/auth.js";
 import * as progress from "../lib/progress.js";
@@ -76,35 +77,6 @@ function octPath(cx, cy, r, rotate = 0) {
     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   }
   ctx.closePath();
-}
-
-function drawEqLabel(cx, baselineY, text, color, mirror = false) {
-  ctx.font = "bold 14px ui-monospace, Menlo, monospace";
-  const padX = 8, bh = 22;
-  const tw = ctx.measureText(text).width;
-  const bw = tw + padX * 2;
-  const bx = cx - bw / 2;
-  const by = baselineY - bh;
-
-  ctx.fillStyle = "#0a0a14";
-  roundRect(bx, by, bw, bh, 5);
-  ctx.fill();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  ctx.fillStyle = "#fff";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  if (mirror) {
-    ctx.save();
-    ctx.translate(cx, by + bh / 2 + 1);
-    ctx.scale(-1, 1);
-    ctx.fillText(text, 0, 0);
-    ctx.restore();
-  } else {
-    ctx.fillText(text, cx, by + bh / 2 + 1);
-  }
 }
 
 // ---------- entities
@@ -268,11 +240,11 @@ function drawEnemy(e) {
   // equation label: hidden for invulnerable boss; mirrored when boss is active
   if (e.type === "boss") {
     if (!e.invulnerable) {
-      const mirrored = getBossDef(e).mirrorEquation === true;
-      drawEqLabel(e.x, e.y - e.radius - 8, e.text, color, mirrored);
+      const mirror = getBossDef(e).mirrorEquation === true;
+      drawEquation(ctx, { cx: e.x, baselineY: e.y - e.radius - 8, text: e.text, color, mirror });
     }
   } else {
-    drawEqLabel(e.x, e.y - e.radius - 8, e.text, color);
+    drawEquation(ctx, { cx: e.x, baselineY: e.y - e.radius - 8, text: e.text, color });
   }
 
   // optional per-boss custom visuals (neither current boss needs it)

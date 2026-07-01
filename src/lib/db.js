@@ -42,6 +42,32 @@ export async function updateUserProfile(userId, updates) {
   return data;
 }
 
+// Reset every level-progress row and the profile counters to a freshly-created
+// state. Used by the "Reset progress" settings action.
+//
+// We CLEAR rows in place (stars/score/completed → 0/false) rather than DELETE
+// them: the table's RLS only grants SELECT/INSERT/UPDATE to authenticated users
+// (no DELETE policy or grant), so a delete is silently blocked. An update reads
+// back identically to a fresh account — every level derives as 0 stars / locked.
+export async function resetUserData(userId) {
+  const sb = await getSupabase();
+
+  const { error: clearError } = await sb
+    .from("level_progress")
+    .update({ stars: 0, score: 0, completed: false, completed_at: null })
+    .eq("user_id", userId);
+  if (clearError) console.error("Failed to clear level progress:", clearError);
+
+  const { data, error } = await sb
+    .from("profiles")
+    .update({ total_points: 0, total_xp: 0, current_world: 1 })
+    .eq("id", userId)
+    .select()
+    .single();
+  if (error) console.error("Failed to reset profile:", error);
+  return data;
+}
+
 // --- Level Progress ---
 
 export async function saveLevelProgress(userId, world, level, stars, score) {
@@ -79,19 +105,6 @@ export async function saveLevelProgress(userId, world, level, stars, score) {
 
   if (error) console.error("Failed to save level progress:", error);
   return data;
-}
-
-// All progress rows for a single world.
-export async function getWorldProgress(userId, world) {
-  const sb = await getSupabase();
-  const { data, error } = await sb
-    .from("level_progress")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("world", world)
-    .order("level");
-  if (error) console.error("Failed to load world progress:", error);
-  return data || [];
 }
 
 // Every progress row for the user (across all worlds) — used for totals.

@@ -2,7 +2,7 @@
 // summoner damage, the wrong-answer punishment, and ending the run.
 
 import { state } from "../core/state.js";
-import { WRONG_FLASH_DURATION, WRONG_PUSH_PX, SHUFFLE_CHIPS_ON_ANSWER, MAX_HP, xpProgressInLevel } from "../core/config.js";
+import { WRONG_FLASH_DURATION, WRONG_PUSH_PX, SHUFFLE_CHIPS_ON_ANSWER, xpProgressInLevel } from "../core/config.js";
 import { randInt } from "../core/equations.js";
 import { getEnemyDef } from "./enemies/index.js";
 import { gainScore, computeStars } from "./waves.js";

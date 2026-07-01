@@ -63,7 +63,6 @@ export async function signOut() {
 }
 
 export function getCurrentUser() { return currentUser; }
-export function isAuthenticated() { return currentUser !== null; }
 
 export function onAuthChange(callback) {
   authListeners.push(callback);

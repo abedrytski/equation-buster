@@ -58,4 +58,5 @@ export const state = {
   menuScreen: null,          // null = loading (auth+progress not ready yet)
   musicCurrentTrack: "none",
   musicMuted: false,
+  eqFormat: "inline",        // equation display: "inline" | "column" (toggled with `c`)
 };

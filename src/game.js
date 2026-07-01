@@ -4,7 +4,7 @@
 import { state, freshGameState } from "./core/state.js";
 import { announceWave } from "./systems/waves.js";
 import { rebuildChips } from "./systems/chips.js";
-import { primeAudio, updateMusic, restartMusic } from "./ui/audio.js";
+import { primeAudio, restartMusic } from "./ui/audio.js";
 import {
   difficultyForWorldLevel, LEVELS_PER_WORLD, WAVES_PER_LEVEL,
   PLAYER_DAMAGE_MIN, PLAYER_DAMAGE_MAX, playerDamageBonus,

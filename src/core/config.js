@@ -21,7 +21,6 @@ export const CHIP_WRONG_LOCK = 0.35;
 export const WRONG_PUSH_PX = 22;
 export const WRONG_FLASH_DURATION = 0.4;
 export const GRID_SIZE = 56;
-export const LIFE_LOSS_WIPE_RADIUS = 320;
 export const FREEZE_DURATION = 5;
 
 // ---------- lanes
@@ -35,7 +34,6 @@ export const PLAYER_LINE_GAP = 70;
 // ---------- waves
 
 export const BREATHER_DURATION = 4;    // seconds between waves
-export const BOSS_EVERY_N_WAVES = 3;
 
 // ---------- world / level structure
 // A world has LEVELS_PER_WORLD levels. Each regular level is WAVES_PER_LEVEL
@@ -47,8 +45,9 @@ export const NUM_WORLDS = 3;
 // Display names per world (index 0 unused; worlds are 1-based).
 export const WORLD_NAMES = [
   "",
-  "Number Jungle",
-  "Adder's Peak",
+  "Summy Meadow",
+  "Reflection Hollow",
+  "Variable Heights",
   "Times-Table Valley",
   "Division Desert",
   "Fraction Falls",
@@ -60,10 +59,6 @@ export const STREAK_TIERS = [
   { min: 10, mult: 3, tier: "tier3" },
   { min: 20, mult: 5, tier: "tier4" },
 ];
-
-// Highest streak multiplier — used as the ceiling when computing a level's
-// theoretical max score for star ratings.
-export const MAX_STREAK_MULT = STREAK_TIERS[STREAK_TIERS.length - 1].mult;
 
 // ---------- level plan (world → level → enemy proportions + difficulty)
 //
@@ -92,7 +87,7 @@ function lp(maxNum, additional_terms, hp_mult, spawn) {
 }
 
 export const LEVEL_PLAN = {
-  // World 1 — Number Jungle: pure addition; yellow tapers as pink takes over so
+  // World 1 — Summy Meadow: pure addition; yellow tapers as pink takes over so
   // levels stay short instead of grinding through value-1 filler.
   1: {
     1: lp(10, 0, 1.0, { yellow: 8, ice: 1 }),
@@ -101,8 +96,9 @@ export const LEVEL_PLAN = {
     4: lp(18, 0, 1.45, { yellow: 5, pink: 9, ice: 2, heart: 2 }),
     5: lp(20, 0, 1.6, {}),
   },
-  // World 2 — Adder's Peak: subtraction (green) and the shielded brute (blue)
-  // join the roster; blue builds toward a shield-heavy L4 finale.
+  // World 2 — Reflection Hollow: subtraction (green) and the shielded brute
+  // (blue) join the roster; blue builds toward a shield-heavy L4 finale, and the
+  // boss is the Mirror.
   2: {
     1: lp(18, 0, 1.75, { yellow: 5, pink: 5, green: 1, ice: 1 }),
     2: lp(20, 0, 1.9, { yellow: 5, pink: 5, green: 3, blue: 1, ice: 1, heart: 2 }),
@@ -110,8 +106,9 @@ export const LEVEL_PLAN = {
     4: lp(25, 0, 2.25, { yellow: 3, pink: 4, green: 6, blue: 4, ice: 2, heart: 2 }),
     5: lp(28, 0, 2.4, {}),
   },
-  // World 3 — Times-Table Valley: the hexagon brute headlines; blue is a steady
-  // presence so the shield mechanic stays in play throughout.
+  // World 3 — Variable Heights: missing-addend equations (2+?=5); the hexagon
+  // brute headlines and blue is a steady presence so the shield mechanic stays
+  // in play throughout.
   3: {
     1: lp(25, 0, 2.5, { yellow: 3, pink: 3, green: 5, blue: 3, hexagon: 2, ice: 1, heart: 2 }),
     2: lp(28, 0, 2.65, { yellow: 3, pink: 3, green: 5, blue: 3, hexagon: 3, ice: 1, heart: 2 }),
@@ -167,7 +164,7 @@ export function difficultyForWorldLevel(world, level, diffMult = 1) {
 
 // ---------- bosses
 
-export const BOSS_ORBIT_RADIUS = 90;
+export const BOSS_ORBIT_RADIUS = 340;
 export const BOSS_ORBIT_SPEED = 0.9; // rad/sec
 export const NUM_MINIS = 3;
 export const SUMMONER_MINIONS = 3;
@@ -191,7 +188,6 @@ export const SPAWN_FADE_DURATION = 0.45;  // seconds for newly spawned enemies t
 // ---------- audio
 
 export const MUSIC_BG_VOL = 0.45;
-export const MUSIC_BOSS_VOL = 0.55;
 
 // ---------- player progression (XP / level)
 

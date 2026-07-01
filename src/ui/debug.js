@@ -90,7 +90,3 @@ export function toggleDebugPanel() {
   panelEl.hidden = !opening;
   if (opening) syncValues();
 }
-
-export function isDebugOpen() {
-  return panelEl !== null && !panelEl.hidden;
-}

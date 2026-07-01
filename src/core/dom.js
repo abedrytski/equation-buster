@@ -76,3 +76,8 @@ export const gameOverSfxEl    = document.getElementById("gameOverSfx");
 export const laserSfxEl       = document.getElementById("laserSfx");
 export const muteBtnEl        = document.getElementById("muteBtn");
 export const homeMuteBtnEl    = document.getElementById("homeMuteBtn");
+// settings dropdown (gear menu on the home screen)
+export const settingsBtnEl    = document.getElementById("settingsBtn");
+export const settingsMenuEl   = document.getElementById("settingsMenu");
+export const resetBtnEl       = document.getElementById("resetBtn");
+export const logoutBtnEl      = document.getElementById("logoutBtn");

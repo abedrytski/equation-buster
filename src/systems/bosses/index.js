@@ -8,12 +8,13 @@
 import mirror from "./mirror.js";
 import summoner from "./summoner.js";
 import sigma from "./sigma.js";
+import absorber from "./absorber.js";
 
-export const BOSSES = { mirror, summoner, sigma };
+export const BOSSES = { mirror, summoner, sigma, absorber };
 
 // Which boss appears on each boss wave, by occurrence (1-based). Extra boss
 // waves clamp to the last entry.
-export const BOSS_ORDER = ["summoner", "mirror", "sigma"];
+export const BOSS_ORDER = ["summoner", "mirror", "sigma", "absorber"];
 
 export function getBossDef(boss) {
   return BOSSES[boss.kind];

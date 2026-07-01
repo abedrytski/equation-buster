@@ -10,16 +10,18 @@ import { initAuthUI, hideAuthScreen, showAuthScreen } from "./lib/authUI.js";
 import {
   restartBtnEl, worldMapBtnEl, homeBtnEl, homePlayBtnEl,
   worldCardBtnEl, worldBackBtnEl, worldPlayBtnEl, levelMapEl,
-  worldPrevBtnEl, worldNextBtnEl, worldNavTitleEl,
+  worldPrevBtnEl, worldNextBtnEl,
   diffPillsEl,
+  settingsBtnEl, settingsMenuEl, resetBtnEl, logoutBtnEl,
 } from "./core/dom.js";
+import { confirmDialog } from "./ui/confirm.js";
 import { initChipDOM } from "./systems/chips.js";
 import { initAudio, updateMusic } from "./ui/audio.js";
 import { update } from "./systems/update.js";
 import { render } from "./ui/render.js";
 import { fireInput } from "./systems/combat.js";
 import { startGame, goToStart } from "./game.js";
-import { toggleDebugPanel, isDebugOpen } from "./ui/debug.js";
+import { toggleDebugPanel } from "./ui/debug.js";
 import { getDifficultyMult, setDifficultyMult } from "./lib/settings.js";
 
 // ---------- startup
@@ -76,6 +78,14 @@ window.addEventListener("keydown", (ev) => {
   // the event originates from a debug input so typing doesn't close it).
   if (state.started && (ev.key === "p" || ev.key === "P") && ev.target.tagName !== "INPUT") {
     toggleDebugPanel();
+    ev.preventDefault();
+    return;
+  }
+
+  // C toggles the equation display format (inline ↔ column) during active play.
+  // Guarded off the game-over screen, where C already means "return to start".
+  if (state.started && !state.gameOver && (ev.key === "c" || ev.key === "C") && ev.target.tagName !== "INPUT") {
+    state.eqFormat = state.eqFormat === "inline" ? "column" : "inline";
     ev.preventDefault();
     return;
   }
@@ -165,6 +175,59 @@ worldPlayBtnEl.addEventListener("click", () => {
 // Back button
 worldBackBtnEl.addEventListener("click", () => { state.menuScreen = "home"; });
 
+// ---------- settings menu (gear): Reset + Log out
+
+function closeSettingsMenu() {
+  settingsMenuEl.hidden = true;
+  settingsBtnEl.setAttribute("aria-expanded", "false");
+}
+function toggleSettingsMenu() {
+  const open = settingsMenuEl.hidden;
+  settingsMenuEl.hidden = !open;
+  settingsBtnEl.setAttribute("aria-expanded", String(open));
+}
+
+settingsBtnEl.addEventListener("click", (ev) => {
+  ev.stopPropagation(); // don't let the outside-click closer see this click
+  toggleSettingsMenu();
+});
+// any click outside the open menu closes it
+document.addEventListener("click", (ev) => {
+  if (settingsMenuEl.hidden) return;
+  if (settingsMenuEl.contains(ev.target)) return;
+  closeSettingsMenu();
+});
+
+resetBtnEl.addEventListener("click", async () => {
+  closeSettingsMenu();
+  const ok = await confirmDialog({
+    title: "Reset progress?",
+    message: "This erases all your stars, levels and XP, starting you over from World 1, Level 1. This can't be undone.",
+    confirmLabel: "Reset",
+    danger: true,
+  });
+  if (!ok) return;
+  await progress.resetProgress();
+  setDifficultyMult(1);
+  syncDiffPills();
+  state.currentWorld = 1;
+  state.selectedLevel = 1;
+  state.menuScreen = "home";
+});
+
+logoutBtnEl.addEventListener("click", async () => {
+  closeSettingsMenu();
+  const ok = await confirmDialog({
+    title: "Log out?",
+    message: "You'll need to sign in again with Google to keep playing.",
+    confirmLabel: "Log out",
+    danger: true,
+  });
+  if (!ok) return;
+  await auth.signOut();
+  window.location.reload(); // fresh load returns to the sign-in screen
+});
+
 // Difficulty pills
 function syncDiffPills() {
   const cur = getDifficultyMult();
@@ -185,8 +248,7 @@ restartBtnEl.addEventListener("click", () => {
   startGame(state.selectedWorld, state.selectedLevel);
 });
 worldMapBtnEl.addEventListener("click", () => {
-  goToStart();
-  state.selectedWorld = progress.getFurthest().world;
-  state.menuScreen = "world";
+  goToStart();              // full reset after the finished run
+  openWorldAtFurthest();    // then open the world map on the latest available level
 });
 homeBtnEl.addEventListener("click", goToStart);
