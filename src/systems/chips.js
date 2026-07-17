@@ -5,7 +5,7 @@ import { state } from "../core/state.js";
 import { placePlayerLine, playerX, playerY } from "../core/view.js";
 import { randInt } from "../core/equations.js";
 import { fireAnswer } from "./combat.js";
-import { MAX_CHIPS, CHIP_WRONG_LOCK } from "../core/config.js";
+import { MAX_CHIPS, CHIP_WRONG_LOCK, CHIP_LOCK_MAX } from "../core/config.js";
 import { chipBarEl } from "../core/dom.js";
 
 export function rebuildChips(shuffle = false) {
@@ -182,7 +182,8 @@ function onChip(btn, index) {
     setTimeout(() => btn.classList.remove("right"), 180);
   } else {
     btn.classList.add("wrong");
-    state.chipLockTimer = CHIP_WRONG_LOCK;
+    // lock grows with the consecutive-wrong streak so spamming rate-limits itself
+    state.chipLockTimer = Math.min(CHIP_LOCK_MAX, CHIP_WRONG_LOCK * state.wrongStreak);
     setTimeout(() => btn.classList.remove("wrong"), 320);
   }
 }

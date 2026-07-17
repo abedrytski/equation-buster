@@ -45,6 +45,7 @@ export function freshGameState() {
     waveQueues: [[], []], // pre-built queues for each wave of this level
     streak: 0,
     bestStreak: 0,
+    wrongStreak: 0,   // consecutive wrong answers; drives the anti-spam penalty
     freezeTimer: 0,
     bonusSpawnedThisWave: {},
     wrongFlashTimer: 0,

@@ -18,6 +18,8 @@ export const MAX_ENEMIES = 4;
 // the player can't memorize a slot. Set to false to keep positions stable.
 export const SHUFFLE_CHIPS_ON_ANSWER = true;
 export const CHIP_WRONG_LOCK = 0.35;
+export const CHIP_LOCK_MAX = 2.0;      // cap on the escalating wrong-answer chip lock
+export const WRONG_STREAK_GRACE = 3;   // consecutive wrongs before wrong answers start costing HP
 export const WRONG_PUSH_PX = 22;
 export const WRONG_FLASH_DURATION = 0.4;
 export const GRID_SIZE = 56;

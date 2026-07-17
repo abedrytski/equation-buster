@@ -2,7 +2,7 @@
 // summoner damage, the wrong-answer punishment, and ending the run.
 
 import { state } from "../core/state.js";
-import { WRONG_FLASH_DURATION, WRONG_PUSH_PX, SHUFFLE_CHIPS_ON_ANSWER, xpProgressInLevel } from "../core/config.js";
+import { WRONG_FLASH_DURATION, WRONG_PUSH_PX, WRONG_STREAK_GRACE, SHUFFLE_CHIPS_ON_ANSWER, xpProgressInLevel } from "../core/config.js";
 import { randInt } from "../core/equations.js";
 import { getEnemyDef } from "./enemies/index.js";
 import { gainScore, computeStars } from "./waves.js";
@@ -120,6 +120,7 @@ export function fireAnswer(answer) {
     state.shakeTimer = 0.45;
     state.wrongFlashTimer = 0.4;
     state.streak = 0;
+    state.wrongStreak += 1;
     // wrong answer punishment: nudge every moving threat closer to the player
     // and flash every enemy (including orbiting minis and stationary ice) so
     // the player gets feedback regardless of which enemies are on screen.
@@ -129,10 +130,22 @@ export function fireAnswer(answer) {
       if (en.speed === 0) continue;          // ice doesn't approach
       en.y += WRONG_PUSH_PX;
     }
+    // anti-spam: wrongStreak tracks accuracy, not consecutive misses — a correct
+    // answer only decays it by 1 (below), so lucky hits from spamming a boss's
+    // few chips can't keep it pinned at 0. Once it climbs past the grace, each
+    // further wrong bleeds HP that grows the deeper you are, so a ~50%-accuracy
+    // spammer drifts up and dies; a 90%+ player stays at 0 and never feels it.
+    // (Chip lock also escalates with wrongStreak in chips.js.)
+    if (state.wrongStreak > WRONG_STREAK_GRACE) {
+      state.hp = Math.max(0, state.hp - (state.wrongStreak - WRONG_STREAK_GRACE));
+      state.flashTimer = 0.35;
+      if (state.hp <= 0) { endGame("Game Over", false); return false; }
+    }
     if (SHUFFLE_CHIPS_ON_ANSWER) rebuildChips(true);
     return false;
   }
 
+  state.wrongStreak = Math.max(0, state.wrongStreak - 1);
   state.streak += 1;
   if (state.streak > state.bestStreak) state.bestStreak = state.streak;
 
