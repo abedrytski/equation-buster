@@ -164,7 +164,11 @@ export function difficultyForWorldLevel(world, level, diffMult = 1) {
 
 // ---------- bosses
 
-export const BOSS_ORBIT_RADIUS = 340;
+// Orbit radii are per-boss: the Mirror keeps its minis close and readable; the
+// Absorber's healers start wide and spiral inward (top of their arc may sit off
+// the visible playfield — that's intended).
+export const MIRROR_ORBIT_RADIUS = 130;
+export const ABSORBER_ORBIT_RADIUS = 340;
 export const BOSS_ORBIT_SPEED = 0.9; // rad/sec
 export const NUM_MINIS = 3;
 export const SUMMONER_MINIONS = 3;
@@ -178,9 +182,6 @@ export const BOSS_COLORS = ["#a78bfa", "#f87171", "#fb923c", "#fbbf24", "#34d399
 // each enemy carries a ~30px equation label above its center, so center y
 // must be ≥ 108 + radius for the label to clear the mask).
 export const TOP_SPAWN_Y = 110;
-// Boss spawn center y. Must be ≥ TOP_SPAWN_Y + BOSS_ORBIT_RADIUS so the
-// orbiting minis at their highest point stay below the wave bar/topMask.
-export const BOSS_SPAWN_Y = TOP_SPAWN_Y + BOSS_ORBIT_RADIUS - 8;
 export const SPAWN_HEAD_CLEARANCE = 180;
 export const LANE_SEPARATION_GAP = 8;
 export const SPAWN_FADE_DURATION = 0.45;  // seconds for newly spawned enemies to fade in

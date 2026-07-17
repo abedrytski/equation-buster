@@ -13,6 +13,7 @@ import {
   worldPrevBtnEl, worldNextBtnEl,
   diffPillsEl,
   settingsBtnEl, settingsMenuEl, resetBtnEl, logoutBtnEl,
+  bossListBtnEl, bossListMenuEl,
 } from "./core/dom.js";
 import { confirmDialog } from "./ui/confirm.js";
 import { initChipDOM } from "./systems/chips.js";
@@ -21,6 +22,8 @@ import { update } from "./systems/update.js";
 import { render } from "./ui/render.js";
 import { fireInput } from "./systems/combat.js";
 import { startGame, goToStart } from "./game.js";
+import { BOSS_ORDER } from "./systems/bosses/index.js";
+import { LEVELS_PER_WORLD } from "./core/config.js";
 import { toggleDebugPanel } from "./ui/debug.js";
 import { getDifficultyMult, setDifficultyMult } from "./lib/settings.js";
 
@@ -179,6 +182,7 @@ worldBackBtnEl.addEventListener("click", () => { state.menuScreen = "home"; });
 
 function closeSettingsMenu() {
   settingsMenuEl.hidden = true;
+  bossListMenuEl.hidden = true;
   settingsBtnEl.setAttribute("aria-expanded", "false");
 }
 function toggleSettingsMenu() {
@@ -191,11 +195,31 @@ settingsBtnEl.addEventListener("click", (ev) => {
   ev.stopPropagation(); // don't let the outside-click closer see this click
   toggleSettingsMenu();
 });
-// any click outside the open menu closes it
+// any click outside the open menu(s) closes it
 document.addEventListener("click", (ev) => {
-  if (settingsMenuEl.hidden) return;
-  if (settingsMenuEl.contains(ev.target)) return;
+  if (settingsMenuEl.hidden && bossListMenuEl.hidden) return;
+  if (settingsMenuEl.contains(ev.target) || bossListMenuEl.contains(ev.target)) return;
   closeSettingsMenu();
+});
+
+// Boss list: jump straight into any boss fight, no unlock required. Each boss
+// maps to the world it normally headlines (its BOSS_ORDER slot), so difficulty
+// and the correct boss both fall out of startGame's existing boss-wave path.
+for (const [i, id] of BOSS_ORDER.entries()) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "settingsItem";
+  btn.textContent = id.charAt(0).toUpperCase() + id.slice(1);
+  btn.addEventListener("click", () => {
+    closeSettingsMenu();
+    startGame(i + 1, LEVELS_PER_WORLD);
+  });
+  bossListMenuEl.appendChild(btn);
+}
+bossListBtnEl.addEventListener("click", (ev) => {
+  ev.stopPropagation();
+  settingsMenuEl.hidden = true;
+  bossListMenuEl.hidden = false;
 });
 
 resetBtnEl.addEventListener("click", async () => {

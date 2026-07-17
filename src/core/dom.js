@@ -81,3 +81,5 @@ export const settingsBtnEl    = document.getElementById("settingsBtn");
 export const settingsMenuEl   = document.getElementById("settingsMenu");
 export const resetBtnEl       = document.getElementById("resetBtn");
 export const logoutBtnEl      = document.getElementById("logoutBtn");
+export const bossListBtnEl    = document.getElementById("bossListBtn");
+export const bossListMenuEl   = document.getElementById("bossListMenu");

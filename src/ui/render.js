@@ -180,6 +180,22 @@ function drawEnemy(e) {
   ctx.lineWidth = spec.shape === "boss" ? 3 : 2;
   ctx.stroke();
 
+  // Absorber minions: green cross = heals the boss on merge; flame = corrupted
+  // (solved) and will damage the boss on merge instead.
+  if (e.healer) {
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    if (e.corrupted) {
+      ctx.font = `${Math.round(e.radius * 1.4)}px serif`;
+      ctx.fillText("🔥", e.x, e.y + 1);
+    } else {
+      const span = e.radius * 0.85, arm = span * 0.34;
+      ctx.fillStyle = "#34d399";
+      ctx.fillRect(e.x - arm / 2, e.y - span / 2, arm, span);
+      ctx.fillRect(e.x - span / 2, e.y - arm / 2, span, arm);
+    }
+  }
+
   // lifetime ring + symbol — countdown ring in the enemy's own color, turning
   // amber when time is nearly up; glyph (spec.glyph) marks the type at a glance
   if (spec.lifetime) {
@@ -202,8 +218,8 @@ function drawEnemy(e) {
     }
   }
 
-  // HP bar for all regular enemies (not bosses or bonus pickups)
-  if (!spec.bonus && spec.shape !== "boss") {
+  // HP bar for all regular enemies (not bosses, bonus pickups, or unkillable corrupted motes)
+  if (!spec.bonus && spec.shape !== "boss" && !e.corrupted) {
     const barW = e.radius * 1.8;
     const barH = 3;
     const barX = e.x - barW / 2;
@@ -243,7 +259,7 @@ function drawEnemy(e) {
       const mirror = getBossDef(e).mirrorEquation === true;
       drawEquation(ctx, { cx: e.x, baselineY: e.y - e.radius - 8, text: e.text, color, mirror });
     }
-  } else {
+  } else if (e.text) {
     drawEquation(ctx, { cx: e.x, baselineY: e.y - e.radius - 8, text: e.text, color });
   }
 

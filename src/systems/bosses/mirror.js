@@ -3,7 +3,7 @@
 // faster, mixed add/subtract). Equations and HP follow pink-enemy scaling.
 
 import { state } from "../../core/state.js";
-import { BOSS_ORBIT_RADIUS, BOSS_ORBIT_SPEED, NUM_MINIS } from "../../core/config.js";
+import { MIRROR_ORBIT_RADIUS, BOSS_ORBIT_SPEED, NUM_MINIS } from "../../core/config.js";
 import { TYPES } from "../enemies/index.js";
 import { randInt, mkSubFloor, operandCap } from "../../core/equations.js";
 import { sharedEq } from "../entities.js";
@@ -46,10 +46,10 @@ export default {
         type: "mini",
         parent: boss,
         orbitAngle: angle,
-        orbitRadius: BOSS_ORBIT_RADIUS,
+        orbitRadius: MIRROR_ORBIT_RADIUS,
         orbitSpeed: BOSS_ORBIT_SPEED,
-        x: boss.x + Math.cos(angle) * BOSS_ORBIT_RADIUS,
-        y: boss.y + Math.sin(angle) * BOSS_ORBIT_RADIUS,
+        x: boss.x + Math.cos(angle) * MIRROR_ORBIT_RADIUS,
+        y: boss.y + Math.sin(angle) * MIRROR_ORBIT_RADIUS,
         text: miniEq.text, answer: miniEq.answer,
         hp: miniHp, maxHp: miniHp,
         radius: miniSpec.radius,
